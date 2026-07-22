@@ -442,13 +442,33 @@ class AddItemModal(Modal, title="Add New Item"):
         item_name = self.item_name_input.value.strip()
         code = add_item(self.guild_id, item_name)
         if code is not None:
+            embed = discord.Embed(
+                title="✅ Item Added",
+                description="The item has been successfully registered.",
+                color=SUCCESS_COLOR
+            )
+            embed.add_field(
+                name=f"{EMOJI_TAG} Item Code",
+                value=f"#{code:03d}",
+                inline=False
+            )
+            embed.add_field(
+                name=f"{EMOJI_CART} Item Name",
+                value=item_name,
+                inline=False
+            )
             await interaction.response.send_message(
-                embed=create_success_embed(f"Added", f"Code `{code}` assigned to `{item_name}`."),
+                embed=embed,
                 ephemeral=True
             )
         else:
+            embed = discord.Embed(
+                title="⚠️ Duplicate Item",
+                description="An item with this name is already registered in the server catalog.",
+                color=ERROR_COLOR
+            )
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Exists", "Item already exists in this server's list."),
+                embed=embed,
                 ephemeral=True
             )
 
@@ -483,20 +503,45 @@ class RemoveItemModal(Modal, title="Remove Item"):
                 break
 
         if item_name is None:
+            embed = discord.Embed(
+                title="🔍 Item Not Found",
+                description=f"No registered item was found with code **#{code:03d}**.",
+                color=ERROR_COLOR
+            )
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Not Found", f"No item with code `{code}` exists."),
+                embed=embed,
                 ephemeral=True
             )
             return
 
         if remove_item_by_code(self.guild_id, code):
+            embed = discord.Embed(
+                title="✅ Item Removed",
+                description="The item has been successfully removed from the server.",
+                color=SUCCESS_COLOR
+            )
+            embed.add_field(
+                name=f"🏷️ Item Code",
+                value=f"#{code:03d}",
+                inline=False
+            )
+            embed.add_field(
+                name=f"📦 Item Name",
+                value=item_name,
+                inline=False
+            )
             await interaction.response.send_message(
-                embed=create_success_embed(f"Removed", f"Code `{code}` (`{item_name}`) removed."),
+                embed=embed,
                 ephemeral=True
             )
         else:
+            embed = discord.Embed(
+                title="⚠️ Removal Failed",
+                description="The item couldn't be removed. Please try again or contact the bot administrator if the issue persists.",
+                color=ERROR_COLOR
+            )
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Error", "Failed to remove item."),
+                embed=embed,
                 ephemeral=True
             )
 
@@ -672,8 +717,8 @@ class ItemListView(View):
         page_items = self.items[start_idx:end_idx]
 
         embed = discord.Embed(
-            title=f"{EMOJI_SEARCH} Server Item List",
-            description=f"Page {self.current_page + 1} of {self.total_pages}",
+            title=f"{EMOJI_CART} Server Registered Item List",
+            description=f"{EMOJI_CART} Registered Items",
             color=VOUCH_COLOR
         )
 
@@ -682,10 +727,14 @@ class ItemListView(View):
         else:
             items_text = ""
             for item in page_items:
-                items_text += f"`{item['code']:03d}` | {item['name']}\n"
-            embed.add_field(name="Available Items", value=items_text or "None", inline=False)
+                items_text += f"{EMOJI_TAG} Item #{item['code']:03d}\n{item['name']}\n\n"
+            embed.description = f"{EMOJI_CART} Registered Items\n\n{items_text}"
 
-        embed.set_footer(text=f"Total Items: {len(self.items)} | Use code with /removeitem")
+        # Add separator and footer info
+        total_items = len(self.items)
+        footer_text = f"━━━━━━━━━━━━━━━━━━━━\n\n📦 Registered Items: {total_items}\n\n💡 Manage your item list anytime through `/vouchsettings`.\n\nPage {self.current_page + 1}/{self.total_pages}"
+        
+        embed.set_footer(text=footer_text)
         return embed
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.gray, emoji="⬅️")
