@@ -29,6 +29,7 @@ EMOJI_TAG = "<:Tag:1529206892486721687>"
 EMOJI_CLOCK = "<:Clock:1529206889844314282>"
 EMOJI_ARROW = "<:Arrow:1529206887504019548>"
 EMOJI_CROSS = "<:Cross:1529485828672323684>"
+EMOJI_CHECK = "<:Check:1529549227770908803>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -470,7 +471,7 @@ class StarButton(Button):
         else:
             # Comment already exists
             embed = discord.Embed(
-                title="✅ Rating & Review Recorded",
+                title=f"{EMOJI_CHECK} Rating & Review Recorded",
                 description=f"Your **star rating** and **review** have both been recorded.\n\n"
                             f"You can now click **Submit Vouch** to publish your vouch.",
                 color=SUCCESS_COLOR
@@ -511,7 +512,7 @@ class CommentModal(Modal, title="Add Review Comment"):
         else:
             # Star rating already exists
             embed = discord.Embed(
-                title="✅ Rating & Review Recorded",
+                title=f"{EMOJI_CHECK} Rating & Review Recorded",
                 description=f"Your **review** and **star rating** have both been recorded.\n\n"
                             f"You can now click **Submit Vouch** to publish your vouch.",
                 color=SUCCESS_COLOR
@@ -553,7 +554,7 @@ class CooldownModal(Modal, title="Set Vouch Cooldown"):
 
         set_server_cooldown(self.guild_id, cooldown_minutes)
         embed = discord.Embed(
-            title="✅ Cooldown Updated",
+            title=f"{EMOJI_CHECK} Cooldown Updated",
             description=f"The vouch cooldown has been set to **{cooldown_minutes} minutes**.",
             color=SUCCESS_COLOR
         )
@@ -598,7 +599,7 @@ class AddItemModal(Modal, title="Add New Item"):
         code = add_item(self.guild_id, item_name)
         if code is not None:
             embed = discord.Embed(
-                title="✅ Item Added",
+                title=f"{EMOJI_CHECK} Item Added",
                 description="The item has been successfully registered.",
                 color=SUCCESS_COLOR
             )
@@ -671,7 +672,7 @@ class RemoveItemModal(Modal, title="Remove Item"):
 
         if remove_item_by_code(self.guild_id, code):
             embed = discord.Embed(
-                title="✅ Item Removed",
+                title=f"{EMOJI_CHECK} Item Removed",
                 description="The item has been successfully removed from the server.",
                 color=SUCCESS_COLOR
             )
@@ -824,7 +825,7 @@ class TraderVouchView(View):
                 for child in self.children:
                     child.disabled = True
 
-                success_msg = "**✅ Vouch Submitted Successfully!**"
+                success_msg = f"**{EMOJI_CHECK} Vouch Submitted Successfully!**"
                 if self.message:
                     await self.message.edit(view=self, content=success_msg)
 
