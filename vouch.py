@@ -599,7 +599,7 @@ class VouchSettingView(View):
     async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(CooldownModal(self.guild_id))
 
-    @discord.ui.button(label="Enable Vouching", style=discord.ButtonStyle.green, emoji=EMOJI_SETTING)
+    @discord.ui.button(label="Disable Vouching", style=discord.ButtonStyle.red, emoji=EMOJI_SETTING)
     async def toggle_vouch_btn(self, interaction: discord.Interaction, button: Button):
         current_enabled = is_vouch_enabled(self.guild_id)
         new_state = not current_enabled
@@ -607,7 +607,7 @@ class VouchSettingView(View):
         
         state_text = "enabled" if new_state else "disabled"
         button.style = discord.ButtonStyle.green if new_state else discord.ButtonStyle.red
-        button.label = "Enable Vouching" if new_state else "Disable Vouching"
+        button.label = "Disable Vouching" if new_state else "Enable Vouching"
         
         embed = discord.Embed(
             title=f"{EMOJI_CHECK} Vouch System Updated",
