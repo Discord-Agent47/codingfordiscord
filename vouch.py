@@ -28,6 +28,7 @@ EMOJI_SEARCH = "<:Search:1529206901831893163>"
 EMOJI_TAG = "<:Tag:1529206892486721687>"
 EMOJI_CLOCK = "<:Clock:1529206889844314282>"
 EMOJI_ARROW = "<:Arrow:1529206887504019548>"
+EMOJI_CROSS = "<:Cross:1529485828672323684>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -447,7 +448,7 @@ class AddItemModal(Modal, title="Add New Item"):
             )
         else:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Exists", "Item already exists in this server's list."),
+                embed=create_error_embed("{EMOJI_CROSS} Exists", "Item already exists in this server's list."),
                 ephemeral=True
             )
 
@@ -469,7 +470,7 @@ class RemoveItemModal(Modal, title="Remove Item"):
             code = int(self.item_code_input.value.strip())
         except ValueError:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Invalid Code", "Please enter a valid numeric code."),
+                embed=create_error_embed("{EMOJI_CROSS} Invalid Code", "Please enter a valid numeric code."),
                 ephemeral=True
             )
             return
@@ -483,7 +484,7 @@ class RemoveItemModal(Modal, title="Remove Item"):
 
         if item_name is None:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Not Found", f"No item with code `{code}` exists."),
+                embed=create_error_embed("{EMOJI_CROSS} Not Found", f"No item with code `{code}` exists."),
                 ephemeral=True
             )
             return
@@ -495,7 +496,7 @@ class RemoveItemModal(Modal, title="Remove Item"):
             )
         else:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Error", "Failed to remove item."),
+                embed=create_error_embed("{EMOJI_CROSS} Error", "Failed to remove item."),
                 ephemeral=True
             )
 
@@ -800,7 +801,7 @@ class Vouch(commands.Cog):
         vouch_channel_id = get_vouch_channel(str(guild.id))
         if vouch_channel_id is None:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Not Configured", "No vouch channel configured."),
+                embed=create_error_embed("{EMOJI_CROSS} Not Configured", "No vouch channel configured."),
                 ephemeral=True
             )
             self.vouch_command.reset_cooldown(interaction)
@@ -809,7 +810,7 @@ class Vouch(commands.Cog):
         vouch_channel = guild.get_channel(vouch_channel_id)
         if vouch_channel is None:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Channel Missing", "Configured channel not found."),
+                embed=create_error_embed("{EMOJI_CROSS} Channel Missing", "Configured channel not found."),
                 ephemeral=True
             )
             self.vouch_command.reset_cooldown(interaction)
@@ -848,14 +849,14 @@ class Vouch(commands.Cog):
         except discord.Forbidden:
             self.vouch_command.reset_cooldown(interaction)
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Error", "No permission to send in vouch channel."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Error", "No permission to send in vouch channel."),
                 ephemeral=True
             )
             return
         except discord.HTTPException:
             self.vouch_command.reset_cooldown(interaction)
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Send Error", "Failed to send message."),
+                embed=create_error_embed("{EMOJI_CROSS} Send Error", "Failed to send message."),
                 ephemeral=True
             )
             return
@@ -882,7 +883,7 @@ class Vouch(commands.Cog):
             )
         elif isinstance(error, commands.MissingPermissions):
              await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "Missing permissions."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "Missing permissions."),
                 ephemeral=True
             )
 
@@ -951,7 +952,7 @@ class Vouch(commands.Cog):
         # Check if user is server administrator
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -963,7 +964,7 @@ class Vouch(commands.Cog):
         vouch_channel_id = get_vouch_channel(str(guild.id))
         if not vouch_channel_id:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Not Configured", "Please run `/vouchsetup` first."),
+                embed=create_error_embed("{EMOJI_CROSS} Not Configured", "Please run `/vouchsetup` first."),
                 ephemeral=True
             )
             return
@@ -994,7 +995,7 @@ class Vouch(commands.Cog):
     async def tradervouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, commands.MissingPermissions):
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "Administrators only."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "Administrators only."),
                 ephemeral=True
             )
 
@@ -1009,7 +1010,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1030,7 +1031,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1058,7 +1059,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1088,7 +1089,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed("{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
