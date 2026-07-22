@@ -745,11 +745,20 @@ class Vouch(commands.Cog):
             if isinstance(item, dict):
                 # Display: "1: Product A"
                 display_name = f"{item['code']}: {item['name']}"
+                # Ensure display_name doesn't exceed 100 characters (Discord API limit)
+                if len(display_name) > 100:
+                    display_name = display_name[:97] + "..."
                 # Value: "Product A" (Code stripped here)
                 value = item['name']
             else:
                 display_name = item
                 value = item
+
+            # Double-check length constraint
+            if len(display_name) > 100:
+                display_name = display_name[:97] + "..."
+            if len(value) > 100:
+                value = value[:100]
 
             choices.append(app_commands.Choice(name=display_name, value=value))
 
