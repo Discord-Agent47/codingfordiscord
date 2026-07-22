@@ -760,8 +760,8 @@ class TraderVouchView(View):
                 )
                 return
 
-            # Process Vouch
-            vouch_id = get_vouch_count(str(self.seller.id)) + 1
+            # Process Vouch (Server-Specific ID)
+            vouch_id = get_server_vouch_count(str(self.seller.id), str(guild.id)) + 1
             add_vouch(str(self.seller.id), 1)
 
             # Save to history with guild_id
