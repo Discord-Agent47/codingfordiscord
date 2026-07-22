@@ -411,6 +411,95 @@ class CommentModal(Modal, title="Add Review Comment"):
         )
 
 
+class VouchSettingView(View):
+    def __init__(self, guild_id: str):
+        super().__init__(timeout=300.0)  # 5 minutes timeout
+        self.guild_id = guild_id
+
+    @discord.ui.button(label="Add Item", style=discord.ButtonStyle.green, emoji=EMOJI_CART)
+    async def add_item_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(AddItemModal(self.guild_id))
+
+    @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red, emoji=EMOJI_TAG)
+    async def remove_item_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(RemoveItemModal(self.guild_id))
+
+
+class AddItemModal(Modal, title="Add New Item"):
+    def __init__(self, guild_id: str):
+        super().__init__()
+        self.guild_id = guild_id
+        self.item_name_input = TextInput(
+            label="Item Name",
+            placeholder="Enter the item name...",
+            required=True,
+            max_length=100
+        )
+        self.add_item(self.item_name_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        item_name = self.item_name_input.value.strip()
+        code = add_item(self.guild_id, item_name)
+        if code is not None:
+            await interaction.response.send_message(
+                embed=create_success_embed("✅ Added", f"Code `{code}` assigned to `{item_name}`."),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Exists", "Item already exists in this server's list."),
+                ephemeral=True
+            )
+
+
+class RemoveItemModal(Modal, title="Remove Item"):
+    def __init__(self, guild_id: str):
+        super().__init__()
+        self.guild_id = guild_id
+        self.item_code_input = TextInput(
+            label="Item Code",
+            placeholder="Enter the item code number...",
+            required=True,
+            max_length=10
+        )
+        self.add_item(self.item_code_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            code = int(self.item_code_input.value.strip())
+        except ValueError:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Invalid Code", "Please enter a valid numeric code."),
+                ephemeral=True
+            )
+            return
+
+        items = get_items(self.guild_id)
+        item_name = None
+        for item in items:
+            if item['code'] == code:
+                item_name = item['name']
+                break
+
+        if item_name is None:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Not Found", f"No item with code `{code}` exists."),
+                ephemeral=True
+            )
+            return
+
+        if remove_item_by_code(self.guild_id, code):
+            await interaction.response.send_message(
+                embed=create_success_embed("✅ Removed", f"Code `{code}` (`{item_name}`) removed."),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Error", "Failed to remove item."),
+                ephemeral=True
+            )
+
+
 class TraderVouchView(View):
     def __init__(self, bot: commands.Bot, seller: discord.Member, item: str, author: discord.Member):
         super().__init__(timeout=300.0)  # 5 minutes timeout
@@ -922,37 +1011,8 @@ class Vouch(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="additem", description="Add an item to this server's list")
-    @app_commands.describe(name="Item name")
-    async def additem_command(self, interaction: discord.Interaction, name: str) -> None:
-        if not await check_guild_context(interaction):
-            return
-
-        if not interaction.guild:
-            return
-
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
-                ephemeral=True
-            )
-            return
-
-        code = add_item(str(interaction.guild.id), name)
-        if code is not None:
-            await interaction.response.send_message(
-                embed=create_success_embed("✅ Added", f"Code `{code}` assigned to `{name}`."),
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                embed=create_error_embed("❌ Exists", "Item already exists in this server's list."),
-                ephemeral=True
-            )
-
-    @app_commands.command(name="removeitem", description="Remove an item by its code")
-    @app_commands.describe(code="Item code number")
-    async def removeitem_command(self, interaction: discord.Interaction, code: int) -> None:
+    @app_commands.command(name="vouchsetting", description="Manage server items with buttons")
+    async def vouchsetting_command(self, interaction: discord.Interaction) -> None:
         if not await check_guild_context(interaction):
             return
 
@@ -967,30 +1027,16 @@ class Vouch(commands.Cog):
             return
 
         guild_id = str(interaction.guild.id)
-        items = get_items(guild_id)
-        item_name = None
-        for item in items:
-            if item['code'] == code:
-                item_name = item['name']
-                break
+        view = VouchSettingView(guild_id)
 
-        if item_name is None:
-            await interaction.response.send_message(
-                embed=create_error_embed("❌ Not Found", f"No item with code `{code}` exists."),
-                ephemeral=True
-            )
-            return
+        embed = discord.Embed(
+            title=f"{EMOJI_CART} Vouch Settings",
+            description="Manage your server's vouch items using the buttons below.",
+            color=VOUCH_COLOR
+        )
+        embed.set_footer(text="These buttons expire in 5 minutes")
 
-        if remove_item_by_code(guild_id, code):
-            await interaction.response.send_message(
-                embed=create_success_embed("✅ Removed", f"Code `{code}` (`{item_name}`) removed."),
-                ephemeral=True
-            )
-        else:
-            await interaction.response.send_message(
-                embed=create_error_embed("❌ Error", "Failed to remove item."),
-                ephemeral=True
-            )
+        await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="addvouch", description="Manually add vouches")
     @app_commands.describe(member="Target member", amount="Amount to add")
