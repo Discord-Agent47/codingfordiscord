@@ -1,0 +1,1049 @@
+from __future__ import annotations
+
+import json
+import os
+import time
+import asyncio
+from pathlib import Path
+from typing import Optional, List, Dict, Any, Union
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+from discord.ui import Button, View, Modal, TextInput
+
+
+# Colors
+SUCCESS_COLOR = discord.Color.green()
+ERROR_COLOR = discord.Color.red()
+VOUCH_COLOR = discord.Color.gold()
+
+# Custom Emojis
+EMOJI_VOUCH = "<a:Laptop:1529207144162005215>"
+EMOJI_CART = "<:Cart:1529206909465399426>"
+EMOJI_SELLER = "<:Seller:1529206906437107995>"
+EMOJI_STAR = "<:Star:1529207360277577798>"
+EMOJI_COMMENT = "<:Comment:1529206903962341478>"
+EMOJI_SEARCH = "<:Search:1529206901831893163>"
+EMOJI_TAG = "<:Tag:1529206892486721687>"
+EMOJI_CLOCK = "<:Clock:1529206889844314282>"
+EMOJI_ARROW = "<:Arrow:1529206887504019548>"
+
+FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
+
+DATA_FOLDER = Path("data")
+VOUCHES_FILE = DATA_FOLDER / "vouches.json"
+ITEMS_FILE = DATA_FOLDER / "vouch_items.json"
+CONFIG_FILE = DATA_FOLDER / "vouch_config.json"
+VOUCH_HISTORY_FILE = DATA_FOLDER / "vouch_history.json"
+
+DEFAULT_ITEMS = [
+    "Product A",
+    "Product B",
+    "Product C",
+    "Product D",
+    "Product E",
+    "Product F",
+]
+
+def load_json(file_path: Path, default: Any = None) -> Any:
+    if not file_path.exists():
+        return default if default is not None else {}
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return default if default is not None else {}
+
+
+def save_json(file_path: Path, data: Any) -> None:
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+
+
+async def check_guild_context(interaction: discord.Interaction) -> bool:
+    """Check if interaction is in a guild. Sends plain text error if in DM."""
+    if interaction.guild is None:
+        await interaction.response.send_message(
+            "Oops! This command doesn't work in DMs.",
+            ephemeral=True
+        )
+        return False
+    return True
+
+
+
+def get_items(guild_id: str) -> List[Dict[str, Any]]:
+    """Get items for a specific guild. Returns defaults if no custom items exist.
+    Returns list of dicts: [{'code': 1, 'name': 'Product A'}, ...]
+    Handles migration from old string format to new dict format.
+    """
+    all_data = load_json(ITEMS_FILE, {})
+    guild_key = str(guild_id)
+
+    guild_items = all_data.get(guild_key, [])
+
+    # Migration: If items are stored as strings (old format), convert to dict format
+    if guild_items and isinstance(guild_items[0], str):
+        migrated_items = []
+        for i, name in enumerate(guild_items):
+            migrated_items.append({"code": i + 1, "name": str(name)})
+        all_data[guild_key] = migrated_items
+        save_json(ITEMS_FILE, all_data)
+        return migrated_items
+
+    # If no custom items for this guild, return defaults with codes 1-6
+    if not guild_items:
+        return [{"code": i+1, "name": name} for i, name in enumerate(DEFAULT_ITEMS)]
+
+    return guild_items
+
+
+def get_next_available_code(guild_items: List[Dict[str, Any]]) -> int:
+    """Find the smallest available code number (reusing vacant numbers)."""
+    if not guild_items:
+        return 1
+
+    existing_codes = sorted([item['code'] for item in guild_items])
+
+    # Find first gap
+    for i, code in enumerate(existing_codes):
+        if code != i + 1:
+            return i + 1
+
+    # No gaps, return next number
+    return existing_codes[-1] + 1
+
+
+def add_item(guild_id: str, name: str) -> Optional[int]:
+    """Add an item for a specific guild. Returns the assigned code or None if exists."""
+    all_data = load_json(ITEMS_FILE, {})
+    guild_key = str(guild_id)
+
+    if guild_key not in all_data:
+        all_data[guild_key] = []
+
+    # Migration: Handle old string format
+    if all_data[guild_key] and isinstance(all_data[guild_key][0], str):
+        migrated_items = []
+        for i, item_name in enumerate(all_data[guild_key]):
+            migrated_items.append({"code": i + 1, "name": str(item_name)})
+        all_data[guild_key] = migrated_items
+
+    normalized_name = name.strip()
+    for item in all_data[guild_key]:
+        # Handle both dict and legacy string formats
+        item_name = item['name'] if isinstance(item, dict) else str(item)
+        if item_name.lower() == normalized_name.lower():
+            return None
+
+    new_code = get_next_available_code(all_data[guild_key])
+    new_item = {"code": new_code, "name": normalized_name}
+    all_data[guild_key].append(new_item)
+    save_json(ITEMS_FILE, all_data)
+    return new_code
+
+
+def remove_item_by_code(guild_id: str, code: int) -> bool:
+    """Remove an item by its code for a specific guild."""
+    all_data = load_json(ITEMS_FILE, {})
+    guild_key = str(guild_id)
+
+    if guild_key not in all_data:
+        return False
+
+    items_list = all_data[guild_key]
+
+    # Migration: Handle old string format (shouldn't happen but safe guard)
+    if items_list and isinstance(items_list[0], str):
+        migrated_items = []
+        for i, item_name in enumerate(items_list):
+            migrated_items.append({"code": i + 1, "name": str(item_name)})
+        all_data[guild_key] = migrated_items
+        items_list = migrated_items
+
+    for i, item in enumerate(items_list):
+        # Handle both dict and legacy formats
+        item_code = item['code'] if isinstance(item, dict) else None
+        if item_code == code:
+            all_data[guild_key].pop(i)
+            save_json(ITEMS_FILE, all_data)
+            return True
+
+    return False
+
+
+def get_item_by_code(guild_id: str, code: int) -> Optional[str]:
+    """Get item name by code for a specific guild."""
+    items = get_items(guild_id)
+    for item in items:
+        if item['code'] == code:
+            return item['name']
+    return None
+
+
+
+def get_vouch_count(user_id: str) -> int:
+    vouches = load_json(VOUCHES_FILE, {})
+    return vouches.get(str(user_id), 0)
+
+
+def add_vouch(user_id: str, amount: int = 1) -> int:
+    vouches = load_json(VOUCHES_FILE, {})
+    user_key = str(user_id)
+    current_count = vouches.get(user_key, 0)
+    new_count = current_count + amount
+    vouches[user_key] = new_count
+    save_json(VOUCHES_FILE, vouches)
+    return new_count
+
+
+def add_vouch_history(seller_id: str, vouch_data: Dict[str, Any]) -> None:
+    """Add a detailed vouch record to history."""
+    history = load_json(VOUCH_HISTORY_FILE, {})
+    seller_key = str(seller_id)
+
+    if seller_key not in history:
+        history[seller_key] = []
+
+    history[seller_key].append(vouch_data)
+    save_json(VOUCH_HISTORY_FILE, history)
+
+
+def get_server_vouch_history(user_id: str, guild_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    """Get recent vouch history for a user in a specific server."""
+    history = load_json(VOUCH_HISTORY_FILE, {})
+    seller_key = str(user_id)
+    user_history = history.get(seller_key, [])
+
+    # Filter by guild_id if stored
+    filtered_history = [h for h in user_history if h.get('guild_id') == str(guild_id)]
+
+    # If no guild-specific entries, return all (backward compatibility)
+    if not filtered_history:
+        filtered_history = user_history
+
+    return list(reversed(filtered_history[-limit:]))
+
+
+def calculate_server_average_rating(user_id: str, guild_id: str) -> float:
+    """Calculate average rating for a user in a specific server."""
+    history = load_json(VOUCH_HISTORY_FILE, {})
+    seller_key = str(user_id)
+    user_history = history.get(seller_key, [])
+
+    # Filter by guild_id if stored
+    filtered_history = [h for h in user_history if h.get('guild_id') == str(guild_id)]
+
+    if not filtered_history:
+        # Fallback to all history if no guild-specific entries
+        filtered_history = user_history
+
+    if not filtered_history:
+        return 0.0
+
+    total_stars = sum(entry.get('stars', 0) for entry in filtered_history)
+    return round(total_stars / len(filtered_history), 2)
+
+
+def get_user_vouch_history(user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+    """Get recent vouch history for a user."""
+    history = load_json(VOUCH_HISTORY_FILE, {})
+    seller_key = str(user_id)
+    user_history = history.get(seller_key, [])
+
+    # Return last N entries reversed (newest first)
+    return list(reversed(user_history[-limit:]))
+
+
+def calculate_average_rating(user_id: str) -> float:
+    """Calculate average rating based on history."""
+    history = load_json(VOUCH_HISTORY_FILE, {})
+    seller_key = str(user_id)
+    user_history = history.get(seller_key, [])
+
+    if not user_history:
+        return 0.0
+
+    total_stars = sum(entry.get('stars', 0) for entry in user_history)
+    return round(total_stars / len(user_history), 2)
+
+
+
+def load_config() -> Dict[str, Any]:
+    return load_json(CONFIG_FILE, {})
+
+
+def save_config(config: Dict[str, Any]) -> None:
+    save_json(CONFIG_FILE, config)
+
+
+def get_vouch_channel(guild_id: str) -> Optional[int]:
+    config = load_config()
+    guild_data = config.get(str(guild_id), {})
+    return guild_data.get("channel")
+
+
+def set_vouch_channel(guild_id: str, channel_id: int) -> None:
+    config = load_config()
+    config[str(guild_id)] = {"channel": channel_id}
+    save_config(config)
+
+
+
+def create_success_embed(title: str, description: Optional[str] = None) -> discord.Embed:
+    embed = discord.Embed(title=title, description=description, color=SUCCESS_COLOR)
+    return embed
+
+
+def create_error_embed(title: str, description: Optional[str] = None) -> discord.Embed:
+    embed = discord.Embed(title=title, description=description, color=ERROR_COLOR)
+    return embed
+
+
+def create_vouch_embed(
+    customer: Union[discord.Member, str],
+    seller: Union[discord.Member, str],
+    item: str,
+    stars: int,
+    review: str,
+    vouch_id: int,
+    vouched_by_override: Optional[Union[discord.Member, str]] = None,
+    timestamp_override: Optional[int] = None
+) -> discord.Embed:
+    star_rating = EMOJI_STAR * stars
+    current_time = timestamp_override if timestamp_override else int(time.time())
+    relative_timestamp = f"<t:{current_time}:R>"
+
+    # Resolve mentions if strings are passed (for trader vouch)
+    customer_mention = customer.mention if hasattr(customer, 'mention') else customer
+    seller_mention = seller.mention if hasattr(seller, 'mention') else seller
+    vouched_by_mention = None
+    if vouched_by_override:
+        vouched_by_mention = vouched_by_override.mention if hasattr(vouched_by_override, 'mention') else vouched_by_override
+
+    embed = discord.Embed(
+        title=f"{EMOJI_VOUCH} A New Vouch Has Emerged from the Vault!",
+        color=VOUCH_COLOR
+    )
+
+    # Handle avatar URL safely
+    if hasattr(seller, 'display_avatar'):
+        embed.set_thumbnail(url=seller.display_avatar.url)
+
+    embed.add_field(name=f"{EMOJI_CART} Product", value=f"{EMOJI_ARROW} {item}", inline=False)
+    embed.add_field(name=f"{EMOJI_SELLER} Seller", value=f"{EMOJI_ARROW} {seller_mention}", inline=False)
+    embed.add_field(name=f"{EMOJI_STAR} Rating", value=f"{EMOJI_ARROW} {star_rating}", inline=False)
+    embed.add_field(name=f"{EMOJI_COMMENT} COMMENT", value=f"{EMOJI_ARROW} {review if review.strip() else 'No additional comments.'}", inline=False)
+
+    if vouched_by_override:
+        vouched_by_display = vouched_by_mention
+    else:
+        vouched_by_display = customer_mention
+
+    spacer = "      "
+    embed.add_field(name=f"{EMOJI_SEARCH} Vouched By", value=f"{EMOJI_ARROW} {vouched_by_display}", inline=True)
+    embed.add_field(name=f"{EMOJI_TAG} Vouch ID{spacer}", value=f"{EMOJI_ARROW} #{vouch_id:05d}", inline=True)
+    embed.add_field(name=f"{EMOJI_CLOCK} Timestamp{spacer}", value=f"{EMOJI_ARROW} {relative_timestamp}", inline=True)
+
+    embed.set_footer(text=FOOTER_TEXT)
+    return embed
+
+
+class StarButton(Button):
+    def __init__(self, stars: int):
+        # Create emoji string: <:Star:...> repeated X times
+        emoji_str = EMOJI_STAR * stars
+        super().__init__(style=discord.ButtonStyle.secondary, emoji=emoji_str, label=f"{stars} Star{'s' if stars > 1 else ''}")
+        self.stars = stars
+
+    async def callback(self, interaction: discord.Interaction):
+        # Security Check: Ensure only the intended buyer can click
+        view: TraderVouchView = self.view
+        if interaction.user.id != view.author.id:
+            await interaction.response.send_message(
+                embed=create_error_embed("Access Denied", "Only the designated buyer can submit this vouch."),
+                ephemeral=True
+            )
+            return
+
+        view.selected_stars = self.stars
+
+        # Update button styles visually
+        for child in view.children:
+            if isinstance(child, StarButton):
+                if child.stars == self.stars:
+                    child.style = discord.ButtonStyle.success
+                else:
+                    child.style = discord.ButtonStyle.secondary
+
+        await interaction.response.edit_message(view=view)
+
+        # Send immediate feedback to the user
+        await interaction.followup.send(
+            embed=create_success_embed("Star Added", f"You selected {self.stars} star{'s' if self.stars > 1 else ''}.\n\nPlease click **Submit Vouch** to finalize."),
+            ephemeral=True
+        )
+
+
+class CommentModal(Modal, title="Add Review Comment"):
+    comment_input = TextInput(label="Review", placeholder="Describe your experience...", required=False, max_length=500)
+
+    def __init__(self, view: 'TraderVouchView'):
+        super().__init__()
+        self.view = view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Security Check
+        if interaction.user.id != self.view.author.id:
+            await interaction.response.send_message(
+                embed=create_error_embed("Access Denied", "Only the designated buyer can add comments."),
+                ephemeral=True
+            )
+            return
+
+        self.view.comment_text = self.comment_input.value.strip()
+        await interaction.response.send_message(
+            embed=create_success_embed("Comment Added", "Your comment has been attached.\n\n*Note: Click 'Submit Vouch' to finalize.*"),
+            ephemeral=True
+        )
+
+
+class TraderVouchView(View):
+    def __init__(self, bot: commands.Bot, seller: discord.Member, item: str, author: discord.Member):
+        super().__init__(timeout=300.0)  # 5 minutes timeout
+        self.bot = bot
+        self.seller = seller
+        self.item = item
+        self.author = author
+        self.selected_stars: Optional[int] = None
+        self.comment_text: str = ""
+        self.message: Optional[discord.Message] = None
+        self.submitted = False  # Flag to prevent double submission
+        self._lock = asyncio.Lock()  # Fix: Add lock to prevent race condition
+
+        # Add star buttons
+        for i in range(1, 6):
+            self.add_item(StarButton(i))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        # Global check for the whole view
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message(
+                embed=create_error_embed("Access Denied", "Only the designated buyer can interact with this session."),
+                ephemeral=True
+            )
+            return False
+        return True
+
+    async def on_timeout(self) -> None:
+        if self.message and not self.submitted:
+            try:
+                for child in self.children:
+                    child.disabled = True
+                await self.message.edit(
+                    view=self,
+                    content="**⚠️ This vouch session has expired.**\nNo vouch was recorded."
+                )
+            except discord.HTTPException:
+                pass
+
+    @discord.ui.button(label="Add Comment", style=discord.ButtonStyle.blurple, emoji=EMOJI_COMMENT, row=1)
+    async def add_comment_btn(self, interaction: discord.Interaction, button: Button):
+        if self.submitted:
+            await interaction.response.send_message("This session is already completed.", ephemeral=True)
+            return
+        await interaction.response.send_modal(CommentModal(self))
+
+    @discord.ui.button(label="Submit Vouch", style=discord.ButtonStyle.green, emoji=EMOJI_VOUCH, row=1)
+    async def submit_btn(self, interaction: discord.Interaction, button: Button):
+        # Fix: Use lock to prevent race condition
+        async with self._lock:
+            # Loophole Fix: Prevent double submission
+            if self.submitted:
+                await interaction.response.send_message(
+                    embed=create_error_embed("Already Submitted", "This vouch has already been processed."),
+                    ephemeral=True
+                )
+                return
+
+            if self.selected_stars is None:
+                await interaction.response.send_message(
+                    embed=create_error_embed("Missing Rating", "Please select a star rating before submitting."),
+                    ephemeral=True
+                )
+                return
+
+            # Mark as submitted immediately to block concurrent clicks
+            self.submitted = True
+
+            guild = interaction.guild
+            if not guild:
+                return
+
+            vouch_channel_id = get_vouch_channel(str(guild.id))
+            if not vouch_channel_id:
+                # Reset flag if config error occurs so admin can fix it and retry?
+                # Better to fail hard on config error.
+                self.submitted = False
+                await interaction.response.send_message(
+                    embed=create_error_embed("Not Configured", "Vouch channel not configured."),
+                    ephemeral=True
+                )
+                return
+
+            vouch_channel = guild.get_channel(vouch_channel_id)
+            if not vouch_channel:
+                self.submitted = False
+                await interaction.response.send_message(
+                    embed=create_error_embed("Channel Missing", "Configured channel not found."),
+                    ephemeral=True
+                )
+                return
+
+            # Process Vouch
+            vouch_id = get_vouch_count(str(self.seller.id)) + 1
+            add_vouch(str(self.seller.id), 1)
+
+            # Save to history with guild_id
+            add_vouch_history(str(self.seller.id), {
+                "vouch_id": vouch_id,
+                "customer": str(self.author.id),
+                "item": self.item,
+                "stars": self.selected_stars,
+                "review": self.comment_text,
+                "timestamp": int(time.time()),
+                "guild_id": str(guild.id)
+            })
+
+            vouch_embed = create_vouch_embed(
+                customer=self.author,
+                seller=self.seller,
+                item=self.item,
+                stars=self.selected_stars,
+                review=self.comment_text,
+                vouch_id=vouch_id
+            )
+
+            try:
+                await vouch_channel.send(embed=vouch_embed)
+
+                # Disable view permanently
+                for child in self.children:
+                    child.disabled = True
+
+                success_msg = "**✅ Vouch Submitted Successfully!**"
+                if self.message:
+                    await self.message.edit(view=self, content=success_msg)
+
+                await interaction.response.send_message(
+                    embed=create_success_embed("Success", "The vouch has been posted to the vouch channel."),
+                    ephemeral=True
+                )
+
+            except discord.Forbidden:
+                self.submitted = False  # Allow retry if permission error was temporary (unlikely) or just log it
+                await interaction.response.send_message(
+                    embed=create_error_embed("Permission Error", "Cannot send messages in vouch channel."),
+                    ephemeral=True
+                )
+            except discord.HTTPException:
+                self.submitted = False
+                await interaction.response.send_message(
+                    embed=create_error_embed("Send Error", "Failed to send message."),
+                    ephemeral=True
+                )
+
+
+# =============================================================================
+# UI COMPONENTS FOR ITEM LIST PAGINATION
+# =============================================================================
+
+class ItemListView(View):
+    def __init__(self, guild_id: str, items_per_page: int = 10):
+        super().__init__(timeout=300.0)
+        self.guild_id = guild_id
+        self.items_per_page = items_per_page
+        self.current_page = 0
+        self.items = get_items(guild_id)
+        self.total_pages = max(1, (len(self.items) + self.items_per_page - 1) // self.items_per_page)
+
+        self.update_buttons()
+
+    def update_buttons(self):
+        self.prev_button.disabled = self.current_page == 0
+        self.next_button.disabled = self.current_page >= self.total_pages - 1
+
+    def get_page_embed(self) -> discord.Embed:
+        start_idx = self.current_page * self.items_per_page
+        end_idx = min(start_idx + self.items_per_page, len(self.items))
+        page_items = self.items[start_idx:end_idx]
+
+        embed = discord.Embed(
+            title=f"{EMOJI_SEARCH} Server Item List",
+            description=f"Page {self.current_page + 1} of {self.total_pages}",
+            color=VOUCH_COLOR
+        )
+
+        if not page_items:
+            embed.add_field(name="No Items", value="No custom items registered yet.", inline=False)
+        else:
+            items_text = ""
+            for item in page_items:
+                items_text += f"`{item['code']:03d}` | {item['name']}\n"
+            embed.add_field(name="Available Items", value=items_text or "None", inline=False)
+
+        embed.set_footer(text=f"Total Items: {len(self.items)} | Use code with /removeitem")
+        return embed
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.gray, emoji="⬅️")
+    async def prev_button(self, interaction: discord.Interaction, button: Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.gray, emoji="➡️")
+    async def next_button(self, interaction: discord.Interaction, button: Button):
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            self.update_buttons()
+            await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
+
+
+# =============================================================================
+# COG DEFINITION
+# =============================================================================
+
+class Vouch(commands.Cog):
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+        DATA_FOLDER.mkdir(parents=True, exist_ok=True)
+
+        if not ITEMS_FILE.exists():
+            save_json(ITEMS_FILE, {})
+        if not VOUCHES_FILE.exists():
+            save_json(VOUCHES_FILE, {})
+        if not CONFIG_FILE.exists():
+            save_json(CONFIG_FILE, {})
+        if not VOUCH_HISTORY_FILE.exists():
+            save_json(VOUCH_HISTORY_FILE, {})
+
+    async def item_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        if not interaction.guild_id:
+            return []
+
+        guild_id = str(interaction.guild_id)
+        items = get_items(guild_id)
+        current_lower = current.lower()
+
+        matching_items = []
+        for item in items:
+            item_name = item['name'] if isinstance(item, dict) else item
+            item_code = str(item.get('code', '')) if isinstance(item, dict) else ''
+
+            # Search by name or code
+            if current_lower in item_name.lower() or current_lower in item_code:
+                matching_items.append(item)
+
+            if len(matching_items) >= 25:
+                break
+
+        choices = []
+        for item in matching_items:
+            if isinstance(item, dict):
+                # Display: "1: Product A"
+                display_name = f"{item['code']}: {item['name']}"
+                # Value: "Product A" (Code stripped here)
+                value = item['name']
+            else:
+                display_name = item
+                value = item
+
+            choices.append(app_commands.Choice(name=display_name, value=value))
+
+        return choices
+
+    @app_commands.command(name="vouch", description="Submit a vouch for a service")
+    @app_commands.describe(
+        seller="The member who provided the service",
+        item="The item or service purchased",
+        vouched_by="Submit on behalf of another member (optional, display only)",
+        stars="Rating from 1 to 5 stars",
+        review="Optional review or comment (max 500 characters)"
+    )
+    @app_commands.choices(stars=[
+        app_commands.Choice(name="1 Star", value=1),
+        app_commands.Choice(name="2 Stars", value=2),
+        app_commands.Choice(name="3 Stars", value=3),
+        app_commands.Choice(name="4 Stars", value=4),
+        app_commands.Choice(name="5 Stars", value=5),
+    ])
+    @app_commands.autocomplete(item=item_autocomplete)
+    @commands.cooldown(1, 300.0)  # 5 minute cooldown per user
+    async def vouch_command(
+        self,
+        interaction: discord.Interaction,
+        seller: discord.Member,
+        item: str,
+        stars: int,
+        vouched_by: Optional[discord.Member] = None,
+        review: Optional[str] = None
+    ) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        guild = interaction.guild
+        if guild is None:
+            return
+
+        vouch_channel_id = get_vouch_channel(str(guild.id))
+        if vouch_channel_id is None:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Not Configured", "No vouch channel configured."),
+                ephemeral=True
+            )
+            self.vouch_command.reset_cooldown(interaction)
+            return
+
+        vouch_channel = guild.get_channel(vouch_channel_id)
+        if vouch_channel is None:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Channel Missing", "Configured channel not found."),
+                ephemeral=True
+            )
+            self.vouch_command.reset_cooldown(interaction)
+            return
+
+        review_text = review.strip() if review else "No additional comments."
+        if len(review_text) > 500:
+            review_text = review_text[:500]
+
+        vouch_id = get_vouch_count(str(seller.id)) + 1
+        add_vouch(str(seller.id), 1)
+
+        # Save history with guild_id
+        add_vouch_history(str(seller.id), {
+            "vouch_id": vouch_id,
+            "customer": str(interaction.user.id),
+            "item": item.strip(),
+            "stars": stars,
+            "review": review_text,
+            "timestamp": int(time.time()),
+            "guild_id": str(guild.id)
+        })
+
+        vouch_embed = create_vouch_embed(
+            customer=interaction.user,
+            seller=seller,
+            item=item,
+            stars=stars,
+            review=review_text,
+            vouch_id=vouch_id,
+            vouched_by_override=vouched_by
+        )
+
+        try:
+            await vouch_channel.send(embed=vouch_embed)
+        except discord.Forbidden:
+            self.vouch_command.reset_cooldown(interaction)
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Error", "No permission to send in vouch channel."),
+                ephemeral=True
+            )
+            return
+        except discord.HTTPException:
+            self.vouch_command.reset_cooldown(interaction)
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Send Error", "Failed to send message."),
+                ephemeral=True
+            )
+            return
+
+        success_embed = create_success_embed(
+            title="✅ Success",
+            description="Your vouch has been submitted successfully."
+        )
+
+        await interaction.response.send_message(embed=success_embed, ephemeral=True)
+
+    @vouch_command.error
+    async def vouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, commands.CommandOnCooldown):
+            retry_after = int(error.retry_after)
+            mins = retry_after // 60
+            secs = retry_after % 60
+            await interaction.response.send_message(
+                embed=create_error_embed(
+                    "⏳ Cooldown Active",
+                    f"You are on cooldown. Please wait **{mins}m {secs}s** before submitting another vouch."
+                ),
+                ephemeral=True
+            )
+        elif isinstance(error, commands.MissingPermissions):
+             await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "Missing permissions."),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="vouchstats", description="View vouch statistics for a user")
+    @app_commands.describe(member="The member to view stats for (defaults to you)")
+    async def vouchstats_command(
+        self,
+        interaction: discord.Interaction,
+        member: Optional[discord.Member] = None
+    ) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        if member is None:
+            member = interaction.user
+
+        total_vouches = get_vouch_count(str(member.id))
+        avg_rating = calculate_average_rating(str(member.id))
+        history = get_user_vouch_history(str(member.id), limit=5)
+
+        embed = discord.Embed(
+            title=f"{EMOJI_SEARCH} Vouch Statistics",
+            description=f"Stats for {member.mention}",
+            color=VOUCH_COLOR
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+
+        embed.add_field(name=f"{EMOJI_STAR} Total Vouches", value=str(total_vouches), inline=True)
+        embed.add_field(name=f"{EMOJI_STAR} Average Rating", value=f"{avg_rating}/5.0" if avg_rating > 0 else "N/A", inline=True)
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+        if history:
+            history_text = ""
+            for h in history:
+                stars_display = EMOJI_STAR * h['stars'] + "☆" * (5 - h['stars'])
+                entry = f"{EMOJI_TAG} `#{h['vouch_id']:05d}`\n{EMOJI_STAR} Rating: {stars_display}\n{EMOJI_CART} {h['item']}\n\n"
+                # Check if adding this entry would exceed Discord's 1024 char limit
+                if len(history_text) + len(entry) > 1024:
+                    break
+                history_text += entry
+
+            embed.add_field(name=f"{EMOJI_SEARCH} Recent Vouches", value=history_text or "None", inline=False)
+        else:
+            embed.add_field(name=f"{EMOJI_SEARCH} Recent Vouches", value="No vouch history found.", inline=False)
+
+        embed.set_footer(text=FOOTER_TEXT)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="tradervouch", description="Admin tool to facilitate a vouch with buttons")
+    @app_commands.describe(
+        seller="The seller receiving the vouch",
+        buyer="The buyer who made the purchase",
+        item="The item sold"
+    )
+    @app_commands.autocomplete(item=item_autocomplete)
+    async def tradervouch_command(
+        self,
+        interaction: discord.Interaction,
+        seller: discord.Member,
+        buyer: discord.Member,
+        item: str
+    ) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        # Check if user is server administrator
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                ephemeral=True
+            )
+            return
+
+        guild = interaction.guild
+        if not guild:
+            return
+
+        vouch_channel_id = get_vouch_channel(str(guild.id))
+        if not vouch_channel_id:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Not Configured", "Please run `/vouchsetup` first."),
+                ephemeral=True
+            )
+            return
+
+        view = TraderVouchView(self.bot, seller, item.strip(), buyer)
+
+        embed = discord.Embed(
+            title=f"{EMOJI_CART} Customer Feedback Request",
+            description=f"Facilitated by {interaction.user.mention}\n\n"
+                        f"**Seller:** {seller.mention}\n"
+                        f"**Item:** {item}\n\n"
+                        f"⭐ Rate your experience below and leave a review comment (optional).",
+            color=VOUCH_COLOR
+        )
+        embed.set_footer(text="This session expires in 5 minutes")
+
+        # Mention buyer outside the embed so they get notified
+        await interaction.response.send_message(
+            content=f"{buyer.mention}",
+            embed=embed,
+            view=view
+        )
+
+        # Fix: Get the message properly after sending
+        view.message = await interaction.original_response()
+
+    @tradervouch_command.error
+    async def tradervouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, commands.MissingPermissions):
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "Administrators only."),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="vouchsetup", description="Configure the vouch channel")
+    @app_commands.describe(channel="The channel for vouches")
+    async def vouchsetup_command(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        if not interaction.guild:
+            return
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                ephemeral=True
+            )
+            return
+
+        set_vouch_channel(str(interaction.guild.id), channel.id)
+        await interaction.response.send_message(
+            embed=create_success_embed("✅ Updated", f"Vouch channel set to {channel.mention}"),
+            ephemeral=True
+        )
+
+    @app_commands.command(name="additem", description="Add an item to this server's list")
+    @app_commands.describe(name="Item name")
+    async def additem_command(self, interaction: discord.Interaction, name: str) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        if not interaction.guild:
+            return
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                ephemeral=True
+            )
+            return
+
+        code = add_item(str(interaction.guild.id), name)
+        if code is not None:
+            await interaction.response.send_message(
+                embed=create_success_embed("✅ Added", f"Code `{code}` assigned to `{name}`."),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Exists", "Item already exists in this server's list."),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="removeitem", description="Remove an item by its code")
+    @app_commands.describe(code="Item code number")
+    async def removeitem_command(self, interaction: discord.Interaction, code: int) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        if not interaction.guild:
+            return
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                ephemeral=True
+            )
+            return
+
+        guild_id = str(interaction.guild.id)
+        items = get_items(guild_id)
+        item_name = None
+        for item in items:
+            if item['code'] == code:
+                item_name = item['name']
+                break
+
+        if item_name is None:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Not Found", f"No item with code `{code}` exists."),
+                ephemeral=True
+            )
+            return
+
+        if remove_item_by_code(guild_id, code):
+            await interaction.response.send_message(
+                embed=create_success_embed("✅ Removed", f"Code `{code}` (`{item_name}`) removed."),
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Error", "Failed to remove item."),
+                ephemeral=True
+            )
+
+    @app_commands.command(name="addvouch", description="Manually add vouches")
+    @app_commands.describe(member="Target member", amount="Amount to add")
+    async def addvouch_command(self, interaction: discord.Interaction, member: discord.Member, amount: Optional[int] = 1) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        if not interaction.guild:
+            return
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                ephemeral=True
+            )
+            return
+
+        if amount < 1:
+            await interaction.response.send_message(embed=create_error_embed("Invalid", "Amount must be >= 1"), ephemeral=True)
+            return
+
+        prev = get_vouch_count(str(member.id))
+        new = add_vouch(str(member.id), amount)
+
+        embed = create_success_embed("✅ Updated")
+        embed.add_field(name="Member", value=member.mention, inline=False)
+        embed.add_field(name="Previous", value=str(prev), inline=True)
+        embed.add_field(name="Added", value=f"+{amount}", inline=True)
+        embed.add_field(name="New Total", value=str(new), inline=True)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="listitems", description="View all registered items for this server")
+    async def listitems_command(self, interaction: discord.Interaction) -> None:
+        if not await check_guild_context(interaction):
+            return
+
+        if not interaction.guild:
+            return
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                embed=create_error_embed("❌ Permission Denied", "This command is reserved for server administrators only."),
+                ephemeral=True
+            )
+            return
+
+        guild_id = str(interaction.guild.id)
+        view = ItemListView(guild_id, items_per_page=10)
+        embed = view.get_page_embed()
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(Vouch(bot))
