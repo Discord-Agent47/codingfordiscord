@@ -365,7 +365,7 @@ class StarButton(Button):
         view: TraderVouchView = self.view
         if interaction.user.id != view.author.id:
             await interaction.response.send_message(
-                embed=create_error_embed("Access Denied", "Only the designated buyer can submit this vouch."),
+                embed=create_error_embed(f"Access Denied", "Only the designated buyer can submit this vouch."),
                 ephemeral=True
             )
             return
@@ -384,7 +384,7 @@ class StarButton(Button):
 
         # Send immediate feedback to the user
         await interaction.followup.send(
-            embed=create_success_embed("Star Added", f"You selected {self.stars} star{'s' if self.stars > 1 else ''}.\n\nPlease click **Submit Vouch** to finalize."),
+            embed=create_success_embed(f"Star Added", f"You selected {self.stars} star{'s' if self.stars > 1 else ''}.\n\nPlease click **Submit Vouch** to finalize."),
             ephemeral=True
         )
 
@@ -400,14 +400,14 @@ class CommentModal(Modal, title="Add Review Comment"):
         # Security Check
         if interaction.user.id != self.view.author.id:
             await interaction.response.send_message(
-                embed=create_error_embed("Access Denied", "Only the designated buyer can add comments."),
+                embed=create_error_embed(f"Access Denied", "Only the designated buyer can add comments."),
                 ephemeral=True
             )
             return
 
         self.view.comment_text = self.comment_input.value.strip()
         await interaction.response.send_message(
-            embed=create_success_embed("Comment Added", "Your comment has been attached.\n\n*Note: Click 'Submit Vouch' to finalize.*"),
+            embed=create_success_embed(f"Comment Added", "Your comment has been attached.\n\n*Note: Click 'Submit Vouch' to finalize.*"),
             ephemeral=True
         )
 
@@ -443,7 +443,7 @@ class AddItemModal(Modal, title="Add New Item"):
         code = add_item(self.guild_id, item_name)
         if code is not None:
             await interaction.response.send_message(
-                embed=create_success_embed("✅ Added", f"Code `{code}` assigned to `{item_name}`."),
+                embed=create_success_embed(f"Added", f"Code `{code}` assigned to `{item_name}`."),
                 ephemeral=True
             )
         else:
@@ -491,7 +491,7 @@ class RemoveItemModal(Modal, title="Remove Item"):
 
         if remove_item_by_code(self.guild_id, code):
             await interaction.response.send_message(
-                embed=create_success_embed("✅ Removed", f"Code `{code}` (`{item_name}`) removed."),
+                embed=create_success_embed(f"Removed", f"Code `{code}` (`{item_name}`) removed."),
                 ephemeral=True
             )
         else:
@@ -522,7 +522,7 @@ class TraderVouchView(View):
         # Global check for the whole view
         if interaction.user.id != self.author.id:
             await interaction.response.send_message(
-                embed=create_error_embed("Access Denied", "Only the designated buyer can interact with this session."),
+                embed=create_error_embed(f"Access Denied", "Only the designated buyer can interact with this session."),
                 ephemeral=True
             )
             return False
@@ -554,14 +554,14 @@ class TraderVouchView(View):
             # Loophole Fix: Prevent double submission
             if self.submitted:
                 await interaction.response.send_message(
-                    embed=create_error_embed("Already Submitted", "This vouch has already been processed."),
+                    embed=create_error_embed(f"Already Submitted", "This vouch has already been processed."),
                     ephemeral=True
                 )
                 return
 
             if self.selected_stars is None:
                 await interaction.response.send_message(
-                    embed=create_error_embed("Missing Rating", "Please select a star rating before submitting."),
+                    embed=create_error_embed(f"Missing Rating", "Please select a star rating before submitting."),
                     ephemeral=True
                 )
                 return
@@ -579,7 +579,7 @@ class TraderVouchView(View):
                 # Better to fail hard on config error.
                 self.submitted = False
                 await interaction.response.send_message(
-                    embed=create_error_embed("Not Configured", "Vouch channel not configured."),
+                    embed=create_error_embed(f"Not Configured", "Vouch channel not configured."),
                     ephemeral=True
                 )
                 return
@@ -588,7 +588,7 @@ class TraderVouchView(View):
             if not vouch_channel:
                 self.submitted = False
                 await interaction.response.send_message(
-                    embed=create_error_embed("Channel Missing", "Configured channel not found."),
+                    embed=create_error_embed(f"Channel Missing", "Configured channel not found."),
                     ephemeral=True
                 )
                 return
@@ -629,20 +629,20 @@ class TraderVouchView(View):
                     await self.message.edit(view=self, content=success_msg)
 
                 await interaction.response.send_message(
-                    embed=create_success_embed("Success", "The vouch has been posted to the vouch channel."),
+                    embed=create_success_embed(f"Success", "The vouch has been posted to the vouch channel."),
                     ephemeral=True
                 )
 
             except discord.Forbidden:
                 self.submitted = False  # Allow retry if permission error was temporary (unlikely) or just log it
                 await interaction.response.send_message(
-                    embed=create_error_embed("Permission Error", "Cannot send messages in vouch channel."),
+                    embed=create_error_embed(f"Permission Error", "Cannot send messages in vouch channel."),
                     ephemeral=True
                 )
             except discord.HTTPException:
                 self.submitted = False
                 await interaction.response.send_message(
-                    embed=create_error_embed("Send Error", "Failed to send message."),
+                    embed=create_error_embed(f"Send Error", "Failed to send message."),
                     ephemeral=True
                 )
 
@@ -862,8 +862,8 @@ class Vouch(commands.Cog):
             return
 
         success_embed = create_success_embed(
-            title="✅ Success",
-            description="Your vouch has been submitted successfully."
+            title=f"Success",
+            description=f"Your vouch has been submitted successfully."
         )
 
         await interaction.response.send_message(embed=success_embed, ephemeral=True)
@@ -876,14 +876,14 @@ class Vouch(commands.Cog):
             secs = retry_after % 60
             await interaction.response.send_message(
                 embed=create_error_embed(
-                    "⏳ Cooldown Active",
+                    f"Cooldown Active",
                     f"You are on cooldown. Please wait **{mins}m {secs}s** before submitting another vouch."
                 ),
                 ephemeral=True
             )
         elif isinstance(error, commands.MissingPermissions):
              await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Missing permissions."),
+                embed=create_error_embed(f"Permission Denied", "Missing permissions."),
                 ephemeral=True
             )
 
@@ -952,7 +952,7 @@ class Vouch(commands.Cog):
         # Check if user is server administrator
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -964,7 +964,7 @@ class Vouch(commands.Cog):
         vouch_channel_id = get_vouch_channel(str(guild.id))
         if not vouch_channel_id:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Not Configured", "Please run `/vouchsetup` first."),
+                embed=create_error_embed(f"Not Configured", "Please run `/vouchsetup` first."),
                 ephemeral=True
             )
             return
@@ -995,7 +995,7 @@ class Vouch(commands.Cog):
     async def tradervouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, commands.MissingPermissions):
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Administrators only."),
+                embed=create_error_embed(f"Permission Denied", "Administrators only."),
                 ephemeral=True
             )
 
@@ -1010,14 +1010,14 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
 
         set_vouch_channel(str(interaction.guild.id), channel.id)
         await interaction.response.send_message(
-            embed=create_success_embed("✅ Updated", f"Vouch channel set to {channel.mention}"),
+            embed=create_success_embed(f"Updated", f"Vouch channel set to {channel.mention}"),
             ephemeral=True
         )
 
@@ -1031,7 +1031,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1059,19 +1059,19 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
 
         if amount < 1:
-            await interaction.response.send_message(embed=create_error_embed("Invalid", "Amount must be >= 1"), ephemeral=True)
+            await interaction.response.send_message(embed=create_error_embed(f"Invalid", "Amount must be >= 1"), ephemeral=True)
             return
 
         prev = get_vouch_count(str(member.id))
         new = add_vouch(str(member.id), amount)
 
-        embed = create_success_embed("✅ Updated")
+        embed = create_success_embed(f"Updated")
         embed.add_field(name="Member", value=member.mention, inline=False)
         embed.add_field(name="Previous", value=str(prev), inline=True)
         embed.add_field(name="Added", value=f"+{amount}", inline=True)
@@ -1089,7 +1089,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
