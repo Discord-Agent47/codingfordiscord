@@ -457,11 +457,26 @@ class StarButton(Button):
 
         await interaction.response.edit_message(view=view)
 
-        # Send immediate feedback to the user
-        await interaction.followup.send(
-            embed=create_success_embed(f"Star Added", f"You selected {self.stars} star{'s' if self.stars > 1 else ''}.\n\nPlease click **Submit Vouch** to finalize."),
-            ephemeral=True
-        )
+        # Determine message based on whether a comment has been added
+        if not view.comment_text:
+            # No comment yet
+            embed = discord.Embed(
+                title="⭐ Star Recorded",
+                description=f"You selected **{self.stars} star(s)**.\n\n"
+                            f"**Next Step (Optional):**\n"
+                            f"You may add a comment/review to share your experience, or click **Submit Vouch** to finish.",
+                color=SUCCESS_COLOR
+            )
+        else:
+            # Comment already exists
+            embed = discord.Embed(
+                title="✅ Rating & Review Recorded",
+                description=f"Your **star rating** and **review** have both been recorded.\n\n"
+                            f"You can now click **Submit Vouch** to publish your vouch.",
+                color=SUCCESS_COLOR
+            )
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 class CommentModal(Modal, title="Add Review Comment"):
@@ -481,10 +496,28 @@ class CommentModal(Modal, title="Add Review Comment"):
             return
 
         self.view.comment_text = self.comment_input.value.strip()
-        await interaction.response.send_message(
-            embed=create_success_embed(f"Comment Added", "Your comment has been attached.\n\n*Note: Click 'Submit Vouch' to finalize.*"),
-            ephemeral=True
-        )
+        
+        # Determine message based on whether a star rating has been selected
+        if self.view.selected_stars is None:
+            # No star rating yet
+            embed = discord.Embed(
+                title="💬 Review Recorded",
+                description=f"Your review has been recorded successfully.\n\n"
+                            f"**Required Next Step:**\n"
+                            f"Please select a **star rating** before clicking **Submit Vouch**.\n\n"
+                            f"A star rating is mandatory to complete your vouch.",
+                color=SUCCESS_COLOR
+            )
+        else:
+            # Star rating already exists
+            embed = discord.Embed(
+                title="✅ Rating & Review Recorded",
+                description=f"Your **review** and **star rating** have both been recorded.\n\n"
+                            f"You can now click **Submit Vouch** to publish your vouch.",
+                color=SUCCESS_COLOR
+            )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 class CooldownModal(Modal, title="Set Vouch Cooldown"):
