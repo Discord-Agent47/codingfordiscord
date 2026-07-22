@@ -1227,36 +1227,6 @@ class Vouch(commands.Cog):
 
         await interaction.response.send_message(embed=embed, view=view)
 
-    @app_commands.command(name="addvouch", description="Manually add vouches")
-    @app_commands.describe(member="Target member", amount="Amount to add")
-    async def addvouch_command(self, interaction: discord.Interaction, member: discord.Member, amount: Optional[int] = 1) -> None:
-        if not await check_guild_context(interaction):
-            return
-
-        if not interaction.guild:
-            return
-
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
-                ephemeral=True
-            )
-            return
-
-        if amount < 1:
-            await interaction.response.send_message(embed=create_error_embed(f"Invalid", "Amount must be >= 1"), ephemeral=True)
-            return
-
-        prev = get_vouch_count(str(member.id))
-        new = add_vouch(str(member.id), amount)
-
-        embed = create_success_embed(f"Updated")
-        embed.add_field(name="Member", value=member.mention, inline=False)
-        embed.add_field(name="Previous", value=str(prev), inline=True)
-        embed.add_field(name="Added", value=f"+{amount}", inline=True)
-        embed.add_field(name="New Total", value=str(new), inline=True)
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="listitems", description="View all registered items for this server")
     async def listitems_command(self, interaction: discord.Interaction) -> None:
