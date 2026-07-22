@@ -37,6 +37,8 @@ VOUCHES_FILE = DATA_FOLDER / "vouches.json"
 ITEMS_FILE = DATA_FOLDER / "vouch_items.json"
 CONFIG_FILE = DATA_FOLDER / "vouch_config.json"
 VOUCH_HISTORY_FILE = DATA_FOLDER / "vouch_history.json"
+COOLDOWNS_FILE = DATA_FOLDER / "vouch_cooldowns.json"
+USER_COOLDOWNS_FILE = DATA_FOLDER / "vouch_user_cooldowns.json"
 
 DEFAULT_ITEMS = [
     "Product A",
@@ -186,6 +188,18 @@ def get_item_by_code(guild_id: str, code: int) -> Optional[str]:
 
 
 
+def get_server_vouch_count(user_id: str, guild_id: str) -> int:
+    """Get vouch count for a user in a specific server."""
+    history = load_json(VOUCH_HISTORY_FILE, {})
+    seller_key = str(user_id)
+    user_history = history.get(seller_key, [])
+    
+    # Filter by guild_id
+    filtered_history = [h for h in user_history if h.get('guild_id') == str(guild_id)]
+    
+    return len(filtered_history)
+
+
 def get_vouch_count(user_id: str) -> int:
     vouches = load_json(VOUCHES_FILE, {})
     return vouches.get(str(user_id), 0)
@@ -289,8 +303,69 @@ def get_vouch_channel(guild_id: str) -> Optional[int]:
 
 def set_vouch_channel(guild_id: str, channel_id: int) -> None:
     config = load_config()
-    config[str(guild_id)] = {"channel": channel_id}
+    if str(guild_id) not in config:
+        config[str(guild_id)] = {}
+    config[str(guild_id)]["channel"] = channel_id
     save_config(config)
+
+
+def get_server_cooldown(guild_id: str) -> int:
+    """Get vouch cooldown for a specific server (default 300 seconds / 5 minutes)."""
+    cooldowns = load_json(COOLDOWNS_FILE, {})
+    guild_key = str(guild_id)
+    # Cooldown is stored in seconds, default is 300 (5 minutes)
+    cooldown = cooldowns.get(guild_key, 300)
+    # Ensure minimum of 300 seconds (5 minutes)
+    return max(300, cooldown)
+
+
+def set_server_cooldown(guild_id: str, cooldown_minutes: int) -> None:
+    """Set vouch cooldown for a specific server. Minimum is 5 minutes."""
+    cooldowns = load_json(COOLDOWNS_FILE, {})
+    guild_key = str(guild_id)
+    # Enforce minimum of 5 minutes (300 seconds)
+    cooldown_seconds = max(300, cooldown_minutes * 60)
+    cooldowns[guild_key] = cooldown_seconds
+    save_json(COOLDOWNS_FILE, cooldowns)
+
+
+def check_user_cooldown(user_id: str, guild_id: str) -> tuple[bool, int]:
+    """
+    Check if user is on cooldown for vouching in a specific server.
+    Returns (is_on_cooldown, remaining_seconds).
+    If not on cooldown, returns (False, 0).
+    """
+    cooldowns = load_json(USER_COOLDOWNS_FILE, {})
+    guild_key = str(guild_id)
+    user_key = str(user_id)
+    
+    if guild_key not in cooldowns:
+        cooldowns[guild_key] = {}
+    
+    user_last_vouch = cooldowns[guild_key].get(user_key, 0)
+    current_time = int(time.time())
+    server_cooldown = get_server_cooldown(guild_id)
+    
+    time_since_last = current_time - user_last_vouch
+    
+    if time_since_last < server_cooldown:
+        remaining = server_cooldown - time_since_last
+        return True, remaining
+    
+    return False, 0
+
+
+def set_user_cooldown(user_id: str, guild_id: str) -> None:
+    """Set the last vouch time for a user in a specific server."""
+    cooldowns = load_json(USER_COOLDOWNS_FILE, {})
+    guild_key = str(guild_id)
+    user_key = str(user_id)
+    
+    if guild_key not in cooldowns:
+        cooldowns[guild_key] = {}
+    
+    cooldowns[guild_key][user_key] = int(time.time())
+    save_json(USER_COOLDOWNS_FILE, cooldowns)
 
 
 
@@ -412,6 +487,49 @@ class CommentModal(Modal, title="Add Review Comment"):
         )
 
 
+class CooldownModal(Modal, title="Set Vouch Cooldown"):
+    def __init__(self, guild_id: str):
+        super().__init__()
+        self.guild_id = guild_id
+        current_cooldown_minutes = get_server_cooldown(guild_id) // 60
+        self.cooldown_input = TextInput(
+            label="Cooldown (minutes)",
+            placeholder=f"Enter cooldown in minutes (minimum 5, current: {current_cooldown_minutes})",
+            required=True,
+            max_length=10,
+            default=str(current_cooldown_minutes)
+        )
+        self.add_item(self.cooldown_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            cooldown_minutes = int(self.cooldown_input.value.strip())
+        except ValueError:
+            await interaction.response.send_message(
+                embed=create_error_embed(f"{EMOJI_CROSS} Invalid Value", "Please enter a valid number."),
+                ephemeral=True
+            )
+            return
+
+        if cooldown_minutes < 5:
+            await interaction.response.send_message(
+                embed=create_error_embed(f"{EMOJI_CROSS} Minimum Cooldown", "The cooldown cannot be set below 5 minutes."),
+                ephemeral=True
+            )
+            return
+
+        set_server_cooldown(self.guild_id, cooldown_minutes)
+        embed = discord.Embed(
+            title="✅ Cooldown Updated",
+            description=f"The vouch cooldown has been set to **{cooldown_minutes} minutes**.",
+            color=SUCCESS_COLOR
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            ephemeral=True
+        )
+
+
 class VouchSettingView(View):
     def __init__(self, guild_id: str):
         super().__init__(timeout=300.0)  # 5 minutes timeout
@@ -424,6 +542,10 @@ class VouchSettingView(View):
     @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red, emoji=EMOJI_TAG)
     async def remove_item_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(RemoveItemModal(self.guild_id))
+
+    @discord.ui.button(label="Set Cooldown", style=discord.ButtonStyle.blurple, emoji=EMOJI_CLOCK)
+    async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(CooldownModal(self.guild_id))
 
 
 class AddItemModal(Modal, title="Add New Item"):
@@ -830,7 +952,6 @@ class Vouch(commands.Cog):
         app_commands.Choice(name="5 Stars", value=5),
     ])
     @app_commands.autocomplete(item=item_autocomplete)
-    @commands.cooldown(1, 300.0)  # 5 minute cooldown per user
     async def vouch_command(
         self,
         interaction: discord.Interaction,
@@ -847,13 +968,26 @@ class Vouch(commands.Cog):
         if guild is None:
             return
 
+        # Check user cooldown for this server
+        is_on_cooldown, remaining_seconds = check_user_cooldown(str(interaction.user.id), str(guild.id))
+        if is_on_cooldown:
+            mins = remaining_seconds // 60
+            secs = remaining_seconds % 60
+            await interaction.response.send_message(
+                embed=create_error_embed(
+                    f"Cooldown Active",
+                    f"You are on cooldown. Please wait **{mins}m {secs}s** before submitting another vouch."
+                ),
+                ephemeral=True
+            )
+            return
+
         vouch_channel_id = get_vouch_channel(str(guild.id))
         if vouch_channel_id is None:
             await interaction.response.send_message(
                 embed=create_error_embed(f"{EMOJI_CROSS} Not Configured", "No vouch channel configured. Contact the Server Administrator"),
                 ephemeral=True
             )
-            self.vouch_command.reset_cooldown(interaction)
             return
 
         vouch_channel = guild.get_channel(vouch_channel_id)
@@ -862,14 +996,13 @@ class Vouch(commands.Cog):
                 embed=create_error_embed(f"{EMOJI_CROSS} Channel Missing", "Configured channel not found."),
                 ephemeral=True
             )
-            self.vouch_command.reset_cooldown(interaction)
             return
 
         review_text = review.strip() if review else "No additional comments."
         if len(review_text) > 500:
             review_text = review_text[:500]
 
-        vouch_id = get_vouch_count(str(seller.id)) + 1
+        vouch_id = get_server_vouch_count(str(seller.id), str(guild.id)) + 1
         add_vouch(str(seller.id), 1)
 
         # Save history with guild_id
@@ -882,6 +1015,9 @@ class Vouch(commands.Cog):
             "timestamp": int(time.time()),
             "guild_id": str(guild.id)
         })
+
+        # Set user cooldown after successful vouch
+        set_user_cooldown(str(interaction.user.id), str(guild.id))
 
         vouch_embed = create_vouch_embed(
             customer=interaction.user,
@@ -896,14 +1032,12 @@ class Vouch(commands.Cog):
         try:
             await vouch_channel.send(embed=vouch_embed)
         except discord.Forbidden:
-            self.vouch_command.reset_cooldown(interaction)
             await interaction.response.send_message(
                 embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "No permission to send in vouch channel."),
                 ephemeral=True
             )
             return
         except discord.HTTPException:
-            self.vouch_command.reset_cooldown(interaction)
             await interaction.response.send_message(
                 embed=create_error_embed(f"{EMOJI_CROSS} Send Error", "Failed to send message."),
                 ephemeral=True
@@ -919,18 +1053,7 @@ class Vouch(commands.Cog):
 
     @vouch_command.error
     async def vouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, commands.CommandOnCooldown):
-            retry_after = int(error.retry_after)
-            mins = retry_after // 60
-            secs = retry_after % 60
-            await interaction.response.send_message(
-                embed=create_error_embed(
-                    f"Cooldown Active",
-                    f"You are on cooldown. Please wait **{mins}m {secs}s** before submitting another vouch."
-                ),
-                ephemeral=True
-            )
-        elif isinstance(error, commands.MissingPermissions):
+        if isinstance(error, commands.MissingPermissions):
              await interaction.response.send_message(
                 embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Missing permissions."),
                 ephemeral=True
@@ -949,9 +1072,14 @@ class Vouch(commands.Cog):
         if member is None:
             member = interaction.user
 
-        total_vouches = get_vouch_count(str(member.id))
-        avg_rating = calculate_average_rating(str(member.id))
-        history = get_user_vouch_history(str(member.id), limit=5)
+        guild = interaction.guild
+        if guild is None:
+            return
+
+        # Get server-specific vouch count and stats
+        total_vouches = get_server_vouch_count(str(member.id), str(guild.id))
+        avg_rating = calculate_server_average_rating(str(member.id), str(guild.id))
+        history = get_server_vouch_history(str(member.id), str(guild.id), limit=5)
 
         embed = discord.Embed(
             title=f"{EMOJI_SEARCH} Vouch Statistics",
@@ -1070,7 +1198,7 @@ class Vouch(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="vouchsetting", description="Manage server items with buttons")
+    @app_commands.command(name="vouchsetting", description="Manage server items and cooldown with buttons")
     async def vouchsetting_command(self, interaction: discord.Interaction) -> None:
         if not await check_guild_context(interaction):
             return
@@ -1087,10 +1215,12 @@ class Vouch(commands.Cog):
 
         guild_id = str(interaction.guild.id)
         view = VouchSettingView(guild_id)
+        
+        current_cooldown_minutes = get_server_cooldown(guild_id) // 60
 
         embed = discord.Embed(
             title=f"{EMOJI_CART} Vouch Settings",
-            description="Manage your server's vouch items using the buttons below.",
+            description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes",
             color=VOUCH_COLOR
         )
         embed.set_footer(text="These buttons expire in 5 minutes")
