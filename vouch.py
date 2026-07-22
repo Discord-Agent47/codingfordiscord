@@ -636,7 +636,7 @@ class TraderVouchView(View):
             except discord.Forbidden:
                 self.submitted = False  # Allow retry if permission error was temporary (unlikely) or just log it
                 await interaction.response.send_message(
-                    embed=create_error_embed(f"Permission Error", "Cannot send messages in vouch channel."),
+                    embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."),
                     ephemeral=True
                 )
             except discord.HTTPException:
@@ -801,7 +801,7 @@ class Vouch(commands.Cog):
         vouch_channel_id = get_vouch_channel(str(guild.id))
         if vouch_channel_id is None:
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Not Configured", "No vouch channel configured."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Not Configured", "No vouch channel configured. Contact the Server Administrator"),
                 ephemeral=True
             )
             self.vouch_command.reset_cooldown(interaction)
@@ -883,7 +883,7 @@ class Vouch(commands.Cog):
             )
         elif isinstance(error, commands.MissingPermissions):
              await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "Missing permissions."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Missing permissions."),
                 ephemeral=True
             )
 
@@ -952,7 +952,7 @@ class Vouch(commands.Cog):
         # Check if user is server administrator
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -995,7 +995,7 @@ class Vouch(commands.Cog):
     async def tradervouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, commands.MissingPermissions):
             await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "Administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Administrators only."),
                 ephemeral=True
             )
 
@@ -1010,7 +1010,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1031,7 +1031,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1059,7 +1059,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
@@ -1089,7 +1089,7 @@ class Vouch(commands.Cog):
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message(
-                embed=create_error_embed(f"Permission Denied", "This command is reserved for server administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
                 ephemeral=True
             )
             return
