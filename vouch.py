@@ -30,6 +30,7 @@ EMOJI_CLOCK = "<:Clock:1529206889844314282>"
 EMOJI_ARROW = "<:Arrow:1529206887504019548>"
 EMOJI_CROSS = "<:Cross:1529485828672323684>"
 EMOJI_CHECK = "<:Check:1529549227770908803>"
+EMOJI_SETTING = "<:Setting:1529559115729338668>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -310,6 +311,23 @@ def set_vouch_channel(guild_id: str, channel_id: int) -> None:
     save_config(config)
 
 
+def is_vouch_enabled(guild_id: str) -> bool:
+    """Check if vouching is enabled for a specific server. Default is True (enabled)."""
+    config = load_config()
+    guild_data = config.get(str(guild_id), {})
+    # Default to True if not set
+    return guild_data.get("enabled", True)
+
+
+def set_vouch_enabled(guild_id: str, enabled: bool) -> None:
+    """Set vouching enabled/disabled for a specific server."""
+    config = load_config()
+    if str(guild_id) not in config:
+        config[str(guild_id)] = {}
+    config[str(guild_id)]["enabled"] = enabled
+    save_config(config)
+
+
 def get_server_cooldown(guild_id: str) -> int:
     """Get vouch cooldown for a specific server (default 300 seconds / 5 minutes)."""
     cooldowns = load_json(COOLDOWNS_FILE, {})
@@ -580,6 +598,24 @@ class VouchSettingView(View):
     @discord.ui.button(label="Set Cooldown", style=discord.ButtonStyle.blurple, emoji=EMOJI_CLOCK)
     async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(CooldownModal(self.guild_id))
+
+    @discord.ui.button(label="Enable Vouching", style=discord.ButtonStyle.green, emoji=EMOJI_SETTING)
+    async def toggle_vouch_btn(self, interaction: discord.Interaction, button: Button):
+        current_enabled = is_vouch_enabled(self.guild_id)
+        new_state = not current_enabled
+        set_vouch_enabled(self.guild_id, new_state)
+        
+        state_text = "enabled" if new_state else "disabled"
+        button.style = discord.ButtonStyle.green if new_state else discord.ButtonStyle.red
+        button.label = "Enable Vouching" if new_state else "Disable Vouching"
+        
+        embed = discord.Embed(
+            title=f"{EMOJI_CHECK} Vouch System Updated",
+            description=f"The vouch system has been **{state_text}** for this server.",
+            color=SUCCESS_COLOR if new_state else ERROR_COLOR
+        )
+        
+        await interaction.response.edit_message(view=self, embed=embed)
 
 
 class AddItemModal(Modal, title="Add New Item"):
@@ -1002,6 +1038,17 @@ class Vouch(commands.Cog):
         if guild is None:
             return
 
+        # Check if vouching is enabled for this server
+        if not is_vouch_enabled(str(guild.id)):
+            await interaction.response.send_message(
+                embed=create_error_embed(
+                    f"{EMOJI_CROSS} Vouch System Disabled",
+                    "The vouching system is currently **disabled** for this server.\n\nPlease contact the server administrator if you have any questions."
+                ),
+                ephemeral=True
+            )
+            return
+
         # Check user cooldown for this server
         is_on_cooldown, remaining_seconds = check_user_cooldown(str(interaction.user.id), str(guild.id))
         if is_on_cooldown:
@@ -1172,6 +1219,17 @@ class Vouch(commands.Cog):
         if not guild:
             return
 
+        # Check if vouching is enabled for this server
+        if not is_vouch_enabled(str(guild.id)):
+            await interaction.response.send_message(
+                embed=create_error_embed(
+                    f"{EMOJI_CROSS} Vouch System Disabled",
+                    "The vouching system is currently **disabled** for this server.\n\nPlease contact the server administrator if you have any questions."
+                ),
+                ephemeral=True
+            )
+            return
+
         vouch_channel_id = get_vouch_channel(str(guild.id))
         if not vouch_channel_id:
             await interaction.response.send_message(
@@ -1251,10 +1309,12 @@ class Vouch(commands.Cog):
         view = VouchSettingView(guild_id)
         
         current_cooldown_minutes = get_server_cooldown(guild_id) // 60
+        vouch_enabled = is_vouch_enabled(guild_id)
+        enabled_status = "✅ Enabled" if vouch_enabled else "❌ Disabled"
 
         embed = discord.Embed(
             title=f"{EMOJI_CART} Vouch Settings",
-            description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes",
+            description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes\n{EMOJI_SETTING} **Vouch System:** {enabled_status}",
             color=VOUCH_COLOR
         )
         embed.set_footer(text="These buttons expire in 5 minutes")
