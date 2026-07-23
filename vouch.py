@@ -619,7 +619,7 @@ class VouchSettingView(View):
     async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(CooldownModal(self.guild_id, self))
 
-    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green, emoji=EMOJI_SETTING)
+    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green)
     async def toggle_vouch_btn(self, interaction: discord.Interaction, button: Button):
         current_enabled = is_vouch_enabled(self.guild_id)
         new_state = not current_enabled
@@ -1375,9 +1375,9 @@ class Vouch(commands.Cog):
         embed.set_footer(text=f"📦 Registered Items: {total_items}")
 
         view = VouchSettingView(guild_id)
-        response = await interaction.response.send_message(embed=embed, view=view)
+        await interaction.response.send_message(embed=embed, view=view)
         # Store reference to the original message for in-place edits
-        view.original_message = await response.original_response()
+        view.original_message = await interaction.original_response()
 
 
     @app_commands.command(name="listitems", description="View all registered items for this server")
