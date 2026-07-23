@@ -804,6 +804,7 @@ class TraderVouchView(View):
         self.author = author
         self.selected_stars: Optional[int] = None
         self.comment_text: str = ""
+        self.image_url: Optional[str] = None
         self.message: Optional[discord.Message] = None
         self.submitted = False  # Flag to prevent double submission
         self._lock = asyncio.Lock()  # Fix: Add lock to prevent race condition
@@ -840,6 +841,56 @@ class TraderVouchView(View):
             await interaction.response.send_message("This session is already completed.", ephemeral=True)
             return
         await interaction.response.send_modal(CommentModal(self))
+
+    @discord.ui.button(label="Add Image Proof", style=discord.ButtonStyle.secondary, emoji=EMOJI_IMAGE, row=1)
+    async def add_image_btn(self, interaction: discord.Interaction, button: Button):
+        if self.submitted:
+            await interaction.response.send_message("This session is already completed.", ephemeral=True)
+            return
+        
+        await interaction.response.send_message(
+            "Please upload **one image attachment** in this channel within **5 minutes**.\n\n"
+            "• Only image files are allowed.\n"
+            "• Maximum of one image.\n"
+            "• Your uploaded image will be attached to your review as proof.\n"
+            "• If you upload another file type, it should be rejected.\n"
+            "• If no image is uploaded before timeout, you may still submit your review without one.",
+            ephemeral=True
+        )
+        
+        try:
+            message = await self.bot.wait_for(
+                "message",
+                check=lambda m: m.author.id == self.author.id and m.channel.id == interaction.channel.id,
+                timeout=300.0
+            )
+            
+            if len(message.attachments) != 1:
+                await interaction.followup.send(
+                    "❌ Please upload exactly **one** attachment.",
+                    ephemeral=True
+                )
+                return
+            
+            attachment = message.attachments[0]
+            if not (attachment.content_type and attachment.content_type.startswith("image/")):
+                await interaction.followup.send(
+                    "❌ Invalid attachment. Please upload a valid image file (PNG, JPG, JPEG, WEBP).",
+                    ephemeral=True
+                )
+                return
+            
+            self.image_url = attachment.url
+            await interaction.followup.send(
+                "✅ Proof image successfully attached.",
+                ephemeral=True
+            )
+            
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "⏱️ Timeout! No image was uploaded. You can still submit your review without an image.",
+                ephemeral=True
+            )
 
     @discord.ui.button(label="Submit Vouch", style=discord.ButtonStyle.green, emoji=EMOJI_VOUCH, row=1)
     async def submit_btn(self, interaction: discord.Interaction, button: Button):
@@ -910,6 +961,9 @@ class TraderVouchView(View):
                 review=self.comment_text,
                 vouch_id=vouch_id
             )
+            
+            if self.image_url:
+                vouch_embed.set_image(url=self.image_url)
 
             try:
                 await vouch_channel.send(embed=vouch_embed)
@@ -1069,7 +1123,8 @@ class Vouch(commands.Cog):
         item="The item or service purchased",
         vouched_by="Submit on behalf of another member (optional, display only)",
         stars="Rating from 1 to 5 stars",
-        review="Optional review or comment (max 500 characters)"
+        review="Optional review or comment (max 500 characters)",
+        image="Optional proof image (PNG, JPG, JPEG, WEBP)"
     )
     @app_commands.choices(stars=[
         app_commands.Choice(name="1 Star", value=1),
@@ -1086,7 +1141,8 @@ class Vouch(commands.Cog):
         item: str,
         stars: int,
         vouched_by: Optional[discord.Member] = None,
-        review: Optional[str] = None
+        review: Optional[str] = None,
+        image: Optional[discord.Attachment] = None
     ) -> None:
         if not await check_guild_context(interaction):
             return
@@ -1094,6 +1150,31 @@ class Vouch(commands.Cog):
         guild = interaction.guild
         if guild is None:
             return
+
+        # Prevent self-vouching
+        if interaction.user.id == seller.id:
+            await interaction.response.send_message(
+                embed=create_error_embed(
+                    f"{EMOJI_CROSS} Self-Vouch Not Allowed",
+                    "You cannot submit a vouch for yourself. Please select another seller."
+                ),
+                ephemeral=True
+            )
+            return
+
+        # Validate image attachment if provided
+        image_url = None
+        if image is not None:
+            if not (image.content_type and image.content_type.startswith("image/")):
+                await interaction.response.send_message(
+                    embed=create_error_embed(
+                        f"{EMOJI_CROSS} Invalid Attachment",
+                        "Invalid attachment. Please upload a valid image file (PNG, JPG, JPEG, WEBP)."
+                    ),
+                    ephemeral=True
+                )
+                return
+            image_url = image.url
 
         # Check if vouching is enabled for this server
         if not is_vouch_enabled(str(guild.id)):
@@ -1166,6 +1247,9 @@ class Vouch(commands.Cog):
             vouch_id=vouch_id,
             vouched_by_override=vouched_by
         )
+        
+        if image_url:
+            vouch_embed.set_image(url=image_url)
 
         try:
             await vouch_channel.send(embed=vouch_embed)
