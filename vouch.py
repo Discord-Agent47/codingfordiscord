@@ -27,10 +27,13 @@ EMOJI_COMMENT = "<:Comment:1529206903962341478>"
 EMOJI_SEARCH = "<:Search:1529206901831893163>"
 EMOJI_TAG = "<:Tag:1529206892486721687>"
 EMOJI_CLOCK = "<:Clock:1529206889844314282>"
-EMOJI_ARROW = "<:Arrow:1529206887504019548>"
+EMOJI_ARROW = "<:Arrow_GG:1529856775103320064>"
 EMOJI_CROSS = "<:Cross:1529485828672323684>"
 EMOJI_CHECK = "<:Check:1529549227770908803>"
-EMOJI_SETTING = "<:Setting:1529559115729338668>"
+EMOJI_SETTING = "<:Setting:1529855660357980210>"
+EMOJI_RANK = "<:Rank:1529733245032464454>"
+EMOJI_STATS = "<:Stats:1529852489896169603>"
+EMOJI_REVIEW = "<:Review:1529853305008689242>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -420,7 +423,7 @@ def create_vouch_embed(
         vouched_by_mention = vouched_by_override.mention if hasattr(vouched_by_override, 'mention') else vouched_by_override
 
     embed = discord.Embed(
-        title=f"{EMOJI_VOUCH} A New Vouch Has Emerged from the Vault!",
+        title=f"{EMOJI_REVIEW} A New Review has Arrived! ",
         color=VOUCH_COLOR
     )
 
@@ -1216,7 +1219,7 @@ class Vouch(commands.Cog):
         history = get_server_vouch_history(str(member.id), str(guild.id), limit=5)
 
         embed = discord.Embed(
-            title=f"{EMOJI_SEARCH} Vouch Statistics",
+            title=f"{EMOJI_STATS} Vouch Statistics",
             description=f"Stats for {member.mention}",
             color=VOUCH_COLOR
         )
@@ -1236,9 +1239,9 @@ class Vouch(commands.Cog):
                     break
                 history_text += entry
 
-            embed.add_field(name=f"{EMOJI_SEARCH} Recent Vouches", value=history_text or "None", inline=False)
+            embed.add_field(name=f"{EMOJI_REVIEW} Recent Vouches", value=history_text or "None", inline=False)
         else:
-            embed.add_field(name=f"{EMOJI_SEARCH} Recent Vouches", value="No vouch history found.", inline=False)
+            embed.add_field(name=f"{EMOJI_REVIEW} Recent Vouches", value="No vouch history found.", inline=False)
 
         embed.set_footer(text=FOOTER_TEXT)
         await interaction.response.send_message(embed=embed, ephemeral=True)
