@@ -402,6 +402,50 @@ def create_error_embed(title: str, description: Optional[str] = None) -> discord
     return embed
 
 
+async def send_temporary_ephemeral(interaction: discord.Interaction, *, 
+                                    embed: Optional[discord.Embed] = None,
+                                    content: Optional[str] = None,
+                                    delay: float = 5.0) -> None:
+    """Send an ephemeral message that auto-deletes after a delay (default 5 seconds)."""
+    response = await interaction.response.send_message(embed=embed, content=content, ephemeral=True)
+    # Schedule deletion after delay
+    asyncio.create_task(_delete_message_after_delay(interaction, delay))
+
+
+async def _delete_message_after_delay(interaction: discord.Interaction, delay: float) -> None:
+    """Delete the interaction's original response after a delay."""
+    try:
+        await asyncio.sleep(delay)
+        # For followup messages, we need to access the original message differently
+        if hasattr(interaction, 'followup') and interaction.followup:
+            # Try to get the original response message
+            try:
+                original_msg = await interaction.original_response()
+                await original_msg.delete()
+            except (discord.NotFound, discord.HTTPException):
+                pass  # Message already deleted or not found
+    except Exception:
+        pass  # Silently ignore deletion errors
+
+
+async def send_temporary_followup(interaction: discord.Interaction, *, 
+                                   embed: Optional[discord.Embed] = None,
+                                   content: Optional[str] = None,
+                                   delay: float = 5.0) -> None:
+    """Send a temporary ephemeral followup message that auto-deletes after a delay."""
+    msg = await interaction.followup.send(embed=embed, content=content, ephemeral=True)
+    asyncio.create_task(_delete_followup_after_delay(msg, delay))
+
+
+async def _delete_followup_after_delay(msg: discord.Message, delay: float) -> None:
+    """Delete a followup message after a delay."""
+    try:
+        await asyncio.sleep(delay)
+        await msg.delete()
+    except (discord.NotFound, discord.HTTPException):
+        pass  # Message already deleted or not found
+
+
 def create_vouch_embed(
     customer: Union[discord.Member, str],
     seller: Union[discord.Member, str],
@@ -462,9 +506,10 @@ class StarButton(Button):
         # Security Check: Ensure only the intended buyer can click
         view: TraderVouchView = self.view
         if interaction.user.id != view.author.id:
-            await interaction.response.send_message(
+            await send_temporary_ephemeral(
+                interaction,
                 embed=create_error_embed(f"Access Denied", "Only the designated buyer can submit this vouch."),
-                ephemeral=True
+                delay=5.0
             )
             return
 
@@ -520,7 +565,7 @@ class StarButton(Button):
                 color=SUCCESS_COLOR
             )
         
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await send_temporary_followup(interaction, embed=embed, delay=5.0)
 
 
 class CommentModal(Modal, title="Add Review Comment"):
@@ -533,9 +578,10 @@ class CommentModal(Modal, title="Add Review Comment"):
     async def on_submit(self, interaction: discord.Interaction):
         # Security Check
         if interaction.user.id != self.view.author.id:
-            await interaction.response.send_message(
+            await send_temporary_ephemeral(
+                interaction,
                 embed=create_error_embed(f"Access Denied", "Only the designated buyer can add comments."),
-                ephemeral=True
+                delay=5.0
             )
             return
 
@@ -583,7 +629,7 @@ class CommentModal(Modal, title="Add Review Comment"):
                 color=SUCCESS_COLOR
             )
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await send_temporary_ephemeral(interaction, embed=embed, delay=5.0)
 
 
 def create_vouch_settings_embed(guild_id: str) -> discord.Embed:
@@ -888,13 +934,15 @@ class TraderVouchView(View):
     @discord.ui.button(label="Add Image Proof", style=discord.ButtonStyle.secondary, emoji=EMOJI_IMAGE, row=1)
     async def add_image_btn(self, interaction: discord.Interaction, button: Button):
         if self.submitted:
-            await interaction.response.send_message(
+            await send_temporary_ephemeral(
+                interaction,
                 embed=create_error_embed(f"{EMOJI_CROSS} Session Completed", "This session is already completed."),
-                ephemeral=True
+                delay=5.0
             )
             return
         
-        await interaction.response.send_message(
+        await send_temporary_ephemeral(
+            interaction,
             embed=discord.Embed(
                 title="🖼️ Upload Proof Image",
                 description="Please upload **one image attachment** in this channel within **5 minutes**.\n\n"
@@ -905,7 +953,7 @@ class TraderVouchView(View):
                             "• If no image is uploaded before timeout, you may still submit your review without one.",
                 color=SUCCESS_COLOR
             ),
-            ephemeral=True
+            delay=5.0
         )
         
         try:
@@ -919,21 +967,23 @@ class TraderVouchView(View):
             if len(message.attachments) != 1:
                 error_title = "❌ Too Many Attachments" if len(message.attachments) > 1 else "❌ No Attachment Found"
                 error_desc = "Please upload exactly one image." if len(message.attachments) > 1 else "No attachment was found. Please upload an image file."
-                await interaction.followup.send(
+                await send_temporary_followup(
+                    interaction,
                     embed=create_error_embed(error_title, error_desc),
-                    ephemeral=True
+                    delay=5.0
                 )
                 return
             
             attachment = message.attachments[0]
             # Validate image content type
             if not (attachment.content_type and attachment.content_type.startswith("image/")):
-                await interaction.followup.send(
+                await send_temporary_followup(
+                    interaction,
                     embed=create_error_embed(
                         f"{EMOJI_CROSS} Invalid Attachment",
                         "Please upload one valid image file (PNG, JPG, JPEG, or WEBP)."
                     ),
-                    ephemeral=True
+                    delay=5.0
                 )
                 return
             
@@ -981,16 +1031,17 @@ class TraderVouchView(View):
                     color=SUCCESS_COLOR
                 )
             
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await send_temporary_followup(interaction, embed=embed, delay=5.0)
             
         except asyncio.TimeoutError:
-            await interaction.followup.send(
+            await send_temporary_followup(
+                interaction,
                 embed=create_error_embed(
                     f"{EMOJI_CLOCK} Image Upload Timed Out",
                     "No image was uploaded within 5 minutes.\n\n"
                     "You may still complete and submit your vouch without attaching a proof image."
                 ),
-                ephemeral=True
+                delay=5.0
             )
 
     @discord.ui.button(label="Submit Vouch", style=discord.ButtonStyle.green, emoji=EMOJI_VOUCH, row=1)
