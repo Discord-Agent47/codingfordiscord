@@ -584,17 +584,14 @@ class CooldownModal(Modal, title="Set Vouch Cooldown"):
                     break
             embed.description = "\n".join(desc_lines)
             await self.setting_view.original_message.edit(embed=embed)
-            await interaction.response.defer()
-        else:
-            embed = discord.Embed(
-                title=f"{EMOJI_CHECK} Cooldown Updated",
-                description=f"The vouch cooldown has been set to **{cooldown_minutes} minutes**.",
-                color=SUCCESS_COLOR
-            )
-            await interaction.response.send_message(
-                embed=embed,
-                ephemeral=True
-            )
+        
+        # Send ephemeral confirmation message
+        confirm_embed = discord.Embed(
+            title=f"{EMOJI_CHECK} Cooldown Updated",
+            description=f"The cooldown has been updated to {cooldown_minutes} minutes.",
+            color=SUCCESS_COLOR
+        )
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
 
 
 class VouchSettingView(View):
@@ -628,7 +625,7 @@ class VouchSettingView(View):
         # Update button appearance
         button.style = discord.ButtonStyle.green if new_state else discord.ButtonStyle.red
         
-        # Update the embed in place
+        # Update the embed in place by reading fresh data
         if self.original_message:
             embed = self.original_message.embeds[0].copy()
             enabled_status = f"{EMOJI_CHECK} Enabled" if new_state else f"{EMOJI_CROSS} Disabled"
@@ -640,9 +637,15 @@ class VouchSettingView(View):
                     break
             embed.description = "\n".join(desc_lines)
             await self.original_message.edit(embed=embed, view=self)
-            await interaction.response.defer()
-        else:
-            await interaction.response.defer()
+        
+        # Send ephemeral confirmation message
+        action_text = "Enabled" if new_state else "Disabled"
+        confirm_embed = discord.Embed(
+            title=f"{EMOJI_CHECK} Vouch System Updated",
+            description=f"Vouching has been {action_text} successfully.",
+            color=SUCCESS_COLOR
+        )
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
 
 
 class AddItemModal(Modal, title="Add New Item"):
