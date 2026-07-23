@@ -839,7 +839,11 @@ class TraderVouchView(View):
             self.add_item(StarButton(i))
 
     async def _send_temporary(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None, delete_after: float = 5.0):
-        """Send an ephemeral message that auto-deletes after specified seconds (default 5)."""
+        """Send an ephemeral message that auto-deletes after specified seconds (default 5).
+        
+        If delete_after > 0, the deletion happens asynchronously in the background
+        so the caller can continue immediately without waiting.
+        """
         try:
             if not interaction.response.is_done():
                 if content is not None:
@@ -856,13 +860,19 @@ class TraderVouchView(View):
                     return
             
             if delete_after > 0:
-                await asyncio.sleep(delete_after)
-                try:
-                    await msg.delete()
-                except discord.HTTPException:
-                    pass
+                # Schedule deletion as a background task to avoid blocking the caller
+                asyncio.create_task(self._delete_message_later(msg, delete_after))
         except discord.HTTPException:
             # Interaction is dead/expired, fail silently
+            pass
+    
+    async def _delete_message_later(self, msg: discord.Message, delay: float):
+        """Delete a message after a delay. Runs as a background task."""
+        try:
+            await asyncio.sleep(delay)
+            await msg.delete()
+        except discord.HTTPException:
+            # Message already deleted or expired, fail silently
             pass
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
