@@ -520,7 +520,7 @@ class StarButton(Button):
                 color=SUCCESS_COLOR
             )
         
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await view.send_temporary_followup(interaction, embed=embed)
 
 
 class CommentModal(Modal, title="Add Review Comment"):
@@ -583,7 +583,7 @@ class CommentModal(Modal, title="Add Review Comment"):
                 color=SUCCESS_COLOR
             )
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await self.view.send_temporary_ephemeral(interaction, embed=embed)
 
 
 def create_vouch_settings_embed(guild_id: str) -> discord.Embed:
@@ -851,10 +851,38 @@ class TraderVouchView(View):
         self.message: Optional[discord.Message] = None
         self.submitted = False  # Flag to prevent double submission
         self._lock = asyncio.Lock()  # Fix: Add lock to prevent race condition
-
+        
         # Add star buttons
         for i in range(1, 6):
             self.add_item(StarButton(i))
+
+    async def send_temporary_ephemeral(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
+        """Send an ephemeral message that auto-deletes after 5 seconds."""
+        if content is not None:
+            msg = await interaction.response.send_message(content, ephemeral=True)
+        elif embed is not None:
+            msg = await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            return
+        try:
+            await asyncio.sleep(5)
+            await msg.delete()
+        except discord.HTTPException:
+            pass
+
+    async def send_temporary_followup(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
+        """Send a temporary ephemeral followup that auto-deletes after 5 seconds."""
+        if content is not None:
+            msg = await interaction.followup.send(content, ephemeral=True)
+        elif embed is not None:
+            msg = await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            return
+        try:
+            await asyncio.sleep(5)
+            await msg.delete()
+        except discord.HTTPException:
+            pass
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         # Global check for the whole view
@@ -881,21 +909,17 @@ class TraderVouchView(View):
     @discord.ui.button(label="Add Comment", style=discord.ButtonStyle.blurple, emoji=EMOJI_COMMENT, row=1)
     async def add_comment_btn(self, interaction: discord.Interaction, button: Button):
         if self.submitted:
-            await interaction.response.send_message("This session is already completed.", ephemeral=True)
+            await self.send_temporary_ephemeral(interaction, content="This session is already completed.")
             return
         await interaction.response.send_modal(CommentModal(self))
 
     @discord.ui.button(label="Add Image Proof", style=discord.ButtonStyle.secondary, emoji=EMOJI_IMAGE, row=1)
     async def add_image_btn(self, interaction: discord.Interaction, button: Button):
         if self.submitted:
-            await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Session Completed", "This session is already completed."),
-                ephemeral=True
-            )
+            await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Session Completed", "This session is already completed."))
             return
         
-        await interaction.response.send_message(
-            embed=discord.Embed(
+        await self.send_temporary_ephemeral(interaction, embed=discord.Embed(
                 title="🖼️ Upload Proof Image",
                 description="Please upload **one image attachment** in this channel within **5 minutes**.\n\n"
                             "• Only image files are allowed.\n"
@@ -904,9 +928,7 @@ class TraderVouchView(View):
                             "• If you upload another file type, it will be rejected.\n"
                             "• If no image is uploaded before timeout, you may still submit your review without one.",
                 color=SUCCESS_COLOR
-            ),
-            ephemeral=True
-        )
+            ))
         
         try:
             message = await self.bot.wait_for(
@@ -919,22 +941,16 @@ class TraderVouchView(View):
             if len(message.attachments) != 1:
                 error_title = f"{EMOJI_CROSS} Too Many Attachments" if len(message.attachments) > 1 else f"{EMOJI_CROSS} No Attachment Found"
                 error_desc = "Please upload exactly one image." if len(message.attachments) > 1 else "No attachment was found. Please click on **Add Image Proof** button and upload image file."
-                await interaction.followup.send(
-                    embed=create_error_embed(error_title, error_desc),
-                    ephemeral=True
-                )
+                await self.send_temporary_followup(interaction, embed=create_error_embed(error_title, error_desc))
                 return
             
             attachment = message.attachments[0]
             # Validate image content type
             if not (attachment.content_type and attachment.content_type.startswith("image/")):
-                await interaction.followup.send(
-                    embed=create_error_embed(
+                await self.send_temporary_followup(interaction, embed=create_error_embed(
                         f"{EMOJI_CROSS} Invalid Attachment",
                         "Please upload one valid image file (PNG, JPG, JPEG, or WEBP)."
-                    ),
-                    ephemeral=True
-                )
+                    ))
                 return
             
             self.image_url = attachment.url
@@ -981,17 +997,14 @@ class TraderVouchView(View):
                     color=SUCCESS_COLOR
                 )
             
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await self.send_temporary_followup(interaction, embed=embed)
             
         except asyncio.TimeoutError:
-            await interaction.followup.send(
-                embed=create_error_embed(
+            await self.send_temporary_followup(interaction, embed=create_error_embed(
                     f"{EMOJI_CLOCK} Image Upload Timed Out",
                     "No image was uploaded within 5 minutes.\n\n"
                     "You may still complete and submit your vouch without attaching a proof image."
-                ),
-                ephemeral=True
-            )
+                ))
 
     @discord.ui.button(label="Submit Vouch", style=discord.ButtonStyle.green, emoji=EMOJI_VOUCH, row=1)
     async def submit_btn(self, interaction: discord.Interaction, button: Button):
@@ -999,17 +1012,11 @@ class TraderVouchView(View):
         async with self._lock:
             # Loophole Fix: Prevent double submission
             if self.submitted:
-                await interaction.response.send_message(
-                    embed=create_error_embed(f"Already Submitted", "This vouch has already been processed."),
-                    ephemeral=True
-                )
+                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Already Submitted", "This vouch has already been processed."))
                 return
 
             if self.selected_stars is None:
-                await interaction.response.send_message(
-                    embed=create_error_embed(f"Missing Rating", "Please select a star rating before submitting."),
-                    ephemeral=True
-                )
+                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Missing Rating", "Please select a star rating before submitting."))
                 return
 
             # Mark as submitted immediately to block concurrent clicks
@@ -1024,19 +1031,13 @@ class TraderVouchView(View):
                 # Reset flag if config error occurs so admin can fix it and retry?
                 # Better to fail hard on config error.
                 self.submitted = False
-                await interaction.response.send_message(
-                    embed=create_error_embed(f"Not Configured", "Vouch channel not configured."),
-                    ephemeral=True
-                )
+                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Not Configured", "Vouch channel not configured."))
                 return
 
             vouch_channel = guild.get_channel(vouch_channel_id)
             if not vouch_channel:
                 self.submitted = False
-                await interaction.response.send_message(
-                    embed=create_error_embed(f"Channel Missing", "Configured channel not found."),
-                    ephemeral=True
-                )
+                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Channel Missing", "Configured channel not found."))
                 return
 
             # Process Vouch (Server-Specific ID)
@@ -1077,6 +1078,7 @@ class TraderVouchView(View):
                 if self.message:
                     await self.message.edit(view=self, content=success_msg)
 
+                # Final success message - DO NOT auto-delete
                 await interaction.response.send_message(
                     embed=create_success_embed(f"Success", "The vouch has been posted to the vouch channel."),
                     ephemeral=True
@@ -1084,16 +1086,10 @@ class TraderVouchView(View):
 
             except discord.Forbidden:
                 self.submitted = False  # Allow retry if permission error was temporary (unlikely) or just log it
-                await interaction.response.send_message(
-                    embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."),
-                    ephemeral=True
-                )
+                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."))
             except discord.HTTPException:
                 self.submitted = False
-                await interaction.response.send_message(
-                    embed=create_error_embed(f"Send Error", "Failed to send message."),
-                    ephemeral=True
-                )
+                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Send Error", "Failed to send message."))
 
 
 # =============================================================================
