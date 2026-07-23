@@ -480,21 +480,42 @@ class StarButton(Button):
 
         await interaction.response.edit_message(view=view)
 
-        # Determine message based on whether a comment has been added
-        if not view.comment_text:
-            # No comment yet
+        # Determine message based on comment and image status
+        has_comment = bool(view.comment_text)
+        has_image = bool(view.image_url)
+
+        if not has_comment and not has_image:
+            # Only star exists
             embed = discord.Embed(
                 title="⭐ Star Recorded",
                 description=f"You selected **{self.stars} star(s)**.\n\n"
                             f"**Next Step (Optional):**\n"
-                            f"You may add a comment/review to share your experience, or click **Submit Vouch** to finish.",
+                            f"You may add a review comment and/or attach a proof image, or click **Submit Vouch** to finish.",
+                color=SUCCESS_COLOR
+            )
+        elif has_comment and not has_image:
+            # Star + comment exist
+            embed = discord.Embed(
+                title=f"{EMOJI_CHECK} Rating & Review Recorded",
+                description=f"Your star rating and review have both been recorded.\n\n"
+                            f"**Optional Next Step:**\n"
+                            f"You may attach a proof image, or click **Submit Vouch** to publish your vouch.",
+                color=SUCCESS_COLOR
+            )
+        elif not has_comment and has_image:
+            # Star + image exist
+            embed = discord.Embed(
+                title=f"{EMOJI_CHECK} Rating & Image Recorded",
+                description=f"Your star rating and proof image have both been recorded.\n\n"
+                            f"**Optional Next Step:**\n"
+                            f"You may add a review comment, or click **Submit Vouch** to publish your vouch.",
                 color=SUCCESS_COLOR
             )
         else:
-            # Comment already exists
+            # Star + comment + image exist
             embed = discord.Embed(
-                title=f"{EMOJI_CHECK} Rating & Review Recorded",
-                description=f"Your **star rating** and **review** have both been recorded.\n\n"
+                title=f"{EMOJI_CHECK} Everything Recorded",
+                description=f"Your star rating, review, and proof image have all been recorded.\n\n"
                             f"You can now click **Submit Vouch** to publish your vouch.",
                 color=SUCCESS_COLOR
             )
@@ -520,22 +541,44 @@ class CommentModal(Modal, title="Add Review Comment"):
 
         self.view.comment_text = self.comment_input.value.strip()
         
-        # Determine message based on whether a star rating has been selected
-        if self.view.selected_stars is None:
-            # No star rating yet
+        # Determine message based on star and image status
+        has_star = self.view.selected_stars is not None
+        has_image = bool(self.view.image_url)
+
+        if not has_star and not has_image:
+            # Only comment exists
             embed = discord.Embed(
                 title="💬 Review Recorded",
                 description=f"Your review has been recorded successfully.\n\n"
                             f"**Required Next Step:**\n"
                             f"Please select a **star rating** before clicking **Submit Vouch**.\n\n"
-                            f"A star rating is mandatory to complete your vouch.",
+                            f"**Optional:**\n"
+                            f"You may also attach a proof image.",
+                color=SUCCESS_COLOR
+            )
+        elif has_star and not has_image:
+            # Comment + star exist
+            embed = discord.Embed(
+                title=f"{EMOJI_CHECK} Rating & Review Recorded",
+                description=f"Your review and star rating have both been recorded.\n\n"
+                            f"**Optional Next Step:**\n"
+                            f"You may attach a proof image, or click **Submit Vouch** to publish your vouch.",
+                color=SUCCESS_COLOR
+            )
+        elif not has_star and has_image:
+            # Comment + image exist
+            embed = discord.Embed(
+                title=f"🖼️ Review & Image Recorded",
+                description=f"Your review and proof image have both been recorded.\n\n"
+                            f"**Required Next Step:**\n"
+                            f"Please select a **star rating** before clicking **Submit Vouch**.",
                 color=SUCCESS_COLOR
             )
         else:
-            # Star rating already exists
+            # Comment + star + image exist
             embed = discord.Embed(
-                title=f"{EMOJI_CHECK} Rating & Review Recorded",
-                description=f"Your **review** and **star rating** have both been recorded.\n\n"
+                title=f"{EMOJI_CHECK} Everything Recorded",
+                description=f"Your review, star rating, and proof image have all been recorded.\n\n"
                             f"You can now click **Submit Vouch** to publish your vouch.",
                 color=SUCCESS_COLOR
             )
@@ -845,16 +888,23 @@ class TraderVouchView(View):
     @discord.ui.button(label="Add Image Proof", style=discord.ButtonStyle.secondary, emoji=EMOJI_IMAGE, row=1)
     async def add_image_btn(self, interaction: discord.Interaction, button: Button):
         if self.submitted:
-            await interaction.response.send_message("This session is already completed.", ephemeral=True)
+            await interaction.response.send_message(
+                embed=create_error_embed(f"{EMOJI_CROSS} Session Completed", "This session is already completed."),
+                ephemeral=True
+            )
             return
         
         await interaction.response.send_message(
-            "Please upload **one image attachment** in this channel within **5 minutes**.\n\n"
-            "• Only image files are allowed.\n"
-            "• Maximum of one image.\n"
-            "• Your uploaded image will be attached to your review as proof.\n"
-            "• If you upload another file type, it should be rejected.\n"
-            "• If no image is uploaded before timeout, you may still submit your review without one.",
+            embed=discord.Embed(
+                title="🖼️ Upload Proof Image",
+                description="Please upload **one image attachment** in this channel within **5 minutes**.\n\n"
+                            "• Only image files are allowed.\n"
+                            "• Maximum of one image.\n"
+                            "• Your uploaded image will be attached to your review as proof.\n"
+                            "• If you upload another file type, it will be rejected.\n"
+                            "• If no image is uploaded before timeout, you may still submit your review without one.",
+                color=SUCCESS_COLOR
+            ),
             ephemeral=True
         )
         
@@ -865,30 +915,81 @@ class TraderVouchView(View):
                 timeout=300.0
             )
             
+            # Validate number of attachments
             if len(message.attachments) != 1:
+                error_title = "❌ Too Many Attachments" if len(message.attachments) > 1 else "❌ No Attachment Found"
+                error_desc = "Please upload exactly one image." if len(message.attachments) > 1 else "No attachment was found. Please upload an image file."
                 await interaction.followup.send(
-                    "❌ Please upload exactly **one** attachment.",
+                    embed=create_error_embed(error_title, error_desc),
                     ephemeral=True
                 )
                 return
             
             attachment = message.attachments[0]
+            # Validate image content type
             if not (attachment.content_type and attachment.content_type.startswith("image/")):
                 await interaction.followup.send(
-                    "❌ Invalid attachment. Please upload a valid image file (PNG, JPG, JPEG, WEBP).",
+                    embed=create_error_embed(
+                        f"{EMOJI_CROSS} Invalid Attachment",
+                        "Please upload one valid image file (PNG, JPG, JPEG, or WEBP)."
+                    ),
                     ephemeral=True
                 )
                 return
             
             self.image_url = attachment.url
-            await interaction.followup.send(
-                "✅ Proof image successfully attached.",
-                ephemeral=True
-            )
+            
+            # Determine success message based on current state
+            has_star = self.selected_stars is not None
+            has_comment = bool(self.comment_text)
+            
+            if not has_star and not has_comment:
+                # Case A — Image uploaded first
+                embed = discord.Embed(
+                    title="🖼️ Proof Image Recorded",
+                    description="Your proof image has been attached successfully.\n\n"
+                                "**Required Next Step:**\n"
+                                "Please select a star rating before submitting your vouch.\n\n"
+                                "**Optional:**\n"
+                                "You may also add a review comment describing your experience.",
+                    color=SUCCESS_COLOR
+                )
+            elif has_star and not has_comment:
+                # Case B — Image uploaded after selecting a star only
+                embed = discord.Embed(
+                    title=f"{EMOJI_CHECK} Rating & Image Recorded",
+                    description="Your star rating and proof image have both been recorded.\n\n"
+                                "**Optional Next Step:**\n"
+                                "You may add a review comment, or click **Submit Vouch** to finish.",
+                    color=SUCCESS_COLOR
+                )
+            elif not has_star and has_comment:
+                # Case C — Image uploaded after adding a comment only
+                embed = discord.Embed(
+                    title="🖼️ Review & Image Recorded",
+                    description="Your review and proof image have both been recorded.\n\n"
+                                "**Required Next Step:**\n"
+                                "Please select a star rating before clicking **Submit Vouch**.",
+                    color=SUCCESS_COLOR
+                )
+            else:
+                # Case D — Image uploaded after both star and comment exist
+                embed = discord.Embed(
+                    title=f"{EMOJI_CHECK} Rating, Review & Image Recorded",
+                    description="Your star rating, review, and proof image have all been recorded.\n\n"
+                                "You can now click **Submit Vouch** to publish your vouch.",
+                    color=SUCCESS_COLOR
+                )
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
             
         except asyncio.TimeoutError:
             await interaction.followup.send(
-                "⏱️ Timeout! No image was uploaded. You can still submit your review without an image.",
+                embed=create_error_embed(
+                    f"{EMOJI_CLOCK} Image Upload Timed Out",
+                    "No image was uploaded within 5 minutes.\n\n"
+                    "You may still complete and submit your vouch without attaching a proof image."
+                ),
                 ephemeral=True
             )
 
