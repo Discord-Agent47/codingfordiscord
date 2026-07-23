@@ -917,8 +917,8 @@ class TraderVouchView(View):
             
             # Validate number of attachments
             if len(message.attachments) != 1:
-                error_title = "❌ Too Many Attachments" if len(message.attachments) > 1 else "❌ No Attachment Found"
-                error_desc = "Please upload exactly one image." if len(message.attachments) > 1 else "No attachment was found. Please upload an image file."
+                error_title = f"{EMOJI_CROSS} Too Many Attachments" if len(message.attachments) > 1 else f"{EMOJI_CROSS} No Attachment Found"
+                error_desc = "Please upload exactly one image." if len(message.attachments) > 1 else "No attachment was found. Please click on **Add Image Proof** button and upload image file."
                 await interaction.followup.send(
                     embed=create_error_embed(error_title, error_desc),
                     ephemeral=True
