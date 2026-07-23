@@ -539,6 +539,22 @@ class CommentModal(Modal, title="Add Review Comment"):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+def create_vouch_settings_embed(guild_id: str) -> discord.Embed:
+    """Create a fresh vouch settings embed from current configuration."""
+    current_cooldown_minutes = get_server_cooldown(guild_id) // 60
+    vouch_enabled = is_vouch_enabled(guild_id)
+    enabled_status = f"{EMOJI_CHECK} Enabled" if vouch_enabled else f"{EMOJI_CROSS} Disabled"
+    
+    embed = discord.Embed(
+        title=f"{EMOJI_CART} Vouch Settings",
+        description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes\n{EMOJI_SETTING} **Vouch System:** {enabled_status}",
+        color=VOUCH_COLOR
+    )
+    total_items = len(get_items(guild_id))
+    embed.set_footer(text=f"📦 Registered Items: {total_items}")
+    return embed
+
+
 class CooldownModal(Modal, title="Set Vouch Cooldown"):
     def __init__(self, guild_id: str, setting_view: Optional[VouchSettingView] = None):
         super().__init__()
@@ -573,17 +589,10 @@ class CooldownModal(Modal, title="Set Vouch Cooldown"):
 
         set_server_cooldown(self.guild_id, cooldown_minutes)
         
-        # Update the settings embed in place if we have a reference to it
+        # Update the settings embed by regenerating it from fresh data
         if self.setting_view and self.setting_view.original_message:
-            embed = self.setting_view.original_message.embeds[0].copy()
-            # Find and update the Cooldown line in description
-            desc_lines = embed.description.split("\n")
-            for i, line in enumerate(desc_lines):
-                if "**Current Cooldown:**" in line:
-                    desc_lines[i] = f"{EMOJI_CLOCK} **Current Cooldown:** {cooldown_minutes} minutes"
-                    break
-            embed.description = "\n".join(desc_lines)
-            await self.setting_view.original_message.edit(embed=embed)
+            new_embed = create_vouch_settings_embed(self.guild_id)
+            await self.setting_view.original_message.edit(embed=new_embed, view=self.setting_view)
         
         # Send ephemeral confirmation message
         confirm_embed = discord.Embed(
@@ -600,7 +609,7 @@ class VouchSettingView(View):
         self.guild_id = guild_id
         self.original_message = original_message
         
-        # Set initial button state based on current vouch status
+        # Set initial button style based on current vouch status
         vouch_enabled = is_vouch_enabled(guild_id)
         self.toggle_vouch_btn.style = discord.ButtonStyle.green if vouch_enabled else discord.ButtonStyle.red
 
@@ -622,21 +631,13 @@ class VouchSettingView(View):
         new_state = not current_enabled
         set_vouch_enabled(self.guild_id, new_state)
         
-        # Update button appearance
+        # Update button appearance immediately
         button.style = discord.ButtonStyle.green if new_state else discord.ButtonStyle.red
         
-        # Update the embed in place by reading fresh data
+        # Regenerate the settings embed from fresh data to avoid sync issues
         if self.original_message:
-            embed = self.original_message.embeds[0].copy()
-            enabled_status = f"{EMOJI_CHECK} Enabled" if new_state else f"{EMOJI_CROSS} Disabled"
-            # Find and update the Vouch System line in description
-            desc_lines = embed.description.split("\n")
-            for i, line in enumerate(desc_lines):
-                if "**Vouch System:**" in line:
-                    desc_lines[i] = f"{EMOJI_SETTING} **Vouch System:** {enabled_status}"
-                    break
-            embed.description = "\n".join(desc_lines)
-            await self.original_message.edit(embed=embed, view=self)
+            new_embed = create_vouch_settings_embed(self.guild_id)
+            await self.original_message.edit(embed=new_embed, view=self)
         
         # Send ephemeral confirmation message
         action_text = "Enabled" if new_state else "Disabled"
@@ -681,13 +682,10 @@ class AddItemModal(Modal, title="Add New Item"):
                 inline=False
             )
             
-            # Update the settings embed in place if we have a reference to it
+            # Update the settings embed by regenerating from fresh data
             if self.setting_view and self.setting_view.original_message:
-                settings_embed = self.setting_view.original_message.embeds[0].copy()
-                # Update the footer with new item count
-                total_items = len(get_items(self.guild_id))
-                settings_embed.set_footer(text=f"📦 Registered Items: {total_items}")
-                await self.setting_view.original_message.edit(embed=settings_embed)
+                new_embed = create_vouch_settings_embed(self.guild_id)
+                await self.setting_view.original_message.edit(embed=new_embed, view=self.setting_view)
                 await interaction.response.send_message(
                     embed=embed,
                     ephemeral=True
@@ -768,13 +766,10 @@ class RemoveItemModal(Modal, title="Remove Item"):
                 inline=False
             )
             
-            # Update the settings embed in place if we have a reference to it
+            # Update the settings embed by regenerating from fresh data
             if self.setting_view and self.setting_view.original_message:
-                settings_embed = self.setting_view.original_message.embeds[0].copy()
-                # Update the footer with new item count
-                total_items = len(get_items(self.guild_id))
-                settings_embed.set_footer(text=f"📦 Registered Items: {total_items}")
-                await self.setting_view.original_message.edit(embed=settings_embed)
+                new_embed = create_vouch_settings_embed(self.guild_id)
+                await self.setting_view.original_message.edit(embed=new_embed, view=self.setting_view)
                 await interaction.response.send_message(
                     embed=embed,
                     ephemeral=True
@@ -1365,17 +1360,7 @@ class Vouch(commands.Cog):
 
         guild_id = str(interaction.guild.id)
         
-        current_cooldown_minutes = get_server_cooldown(guild_id) // 60
-        vouch_enabled = is_vouch_enabled(guild_id)
-        enabled_status = f"{EMOJI_CHECK} Enabled" if vouch_enabled else f"{EMOJI_CROSS} Disabled"
-
-        embed = discord.Embed(
-            title=f"{EMOJI_CART} Vouch Settings",
-            description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes\n{EMOJI_SETTING} **Vouch System:** {enabled_status}",
-            color=VOUCH_COLOR
-        )
-        total_items = len(get_items(guild_id))
-        embed.set_footer(text=f"📦 Registered Items: {total_items}")
+        embed = create_vouch_settings_embed(guild_id)
 
         view = VouchSettingView(guild_id)
         await interaction.response.send_message(embed=embed, view=view)
