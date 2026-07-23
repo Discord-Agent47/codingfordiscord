@@ -858,12 +858,19 @@ class TraderVouchView(View):
 
     async def send_temporary_ephemeral(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
         """Send an ephemeral message that auto-deletes after 5 seconds."""
-        if content is not None:
-            msg = await interaction.followup.send(content, ephemeral=True)
-        elif embed is not None:
-            msg = await interaction.followup.send(embed=embed, ephemeral=True)
+        if not interaction.response.is_done():
+            if content is not None:
+                await interaction.response.send_message(content, ephemeral=True)
+            elif embed is not None:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+            msg = await interaction.original_response()
         else:
-            return
+            if content is not None:
+                msg = await interaction.followup.send(content, ephemeral=True)
+            elif embed is not None:
+                msg = await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                return
         try:
             await asyncio.sleep(5)
             await msg.delete()
