@@ -634,14 +634,25 @@ class CooldownModal(Modal, title="Set Vouch Cooldown"):
 
 
 class VouchSettingView(View):
-    def __init__(self, guild_id: str, original_message: Optional[discord.Message] = None):
+    def __init__(self, guild_id: str, author_id: int, original_message: Optional[discord.Message] = None):
         super().__init__(timeout=300.0)  # 5 minutes timeout
         self.guild_id = guild_id
+        self.author_id = author_id
         self.original_message = original_message
         
         # Set initial button style based on current vouch status
         vouch_enabled = is_vouch_enabled(guild_id)
         self.toggle_vouch_btn.style = discord.ButtonStyle.green if vouch_enabled else discord.ButtonStyle.red
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow the admin who invoked the command to interact with these buttons."""
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                embed=create_error_embed("Access Denied", "Only the administrator who opened this panel can interact with these buttons."),
+                ephemeral=True
+            )
+            return False
+        return True
 
     @discord.ui.button(label="Add Item", style=discord.ButtonStyle.green, emoji=EMOJI_CART)
     async def add_item_btn(self, interaction: discord.Interaction, button: Button):
@@ -1526,7 +1537,7 @@ class Vouch(commands.Cog):
         
         embed = create_vouch_settings_embed(guild_id)
 
-        view = VouchSettingView(guild_id)
+        view = VouchSettingView(guild_id, author_id=interaction.user.id)
         await interaction.response.send_message(embed=embed, view=view)
         # Store reference to the original message for in-place edits
         view.original_message = await interaction.original_response()
