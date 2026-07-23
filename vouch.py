@@ -453,13 +453,11 @@ def create_vouch_embed(
 
 class StarButton(Button):
     def __init__(self, stars: int):
-        # Create emoji string: <:Star:...> repeated X times
         emoji_str = EMOJI_STAR * stars
         super().__init__(style=discord.ButtonStyle.secondary, emoji=emoji_str, label=f"{stars} Star{'s' if stars > 1 else ''}")
         self.stars = stars
 
     async def callback(self, interaction: discord.Interaction):
-        # Security Check: Ensure only the intended buyer can click
         view: TraderVouchView = self.view
         if interaction.user.id != view.author.id:
             await interaction.response.send_message(
@@ -470,22 +468,16 @@ class StarButton(Button):
 
         view.selected_stars = self.stars
 
-        # Update button styles visually
         for child in view.children:
             if isinstance(child, StarButton):
-                if child.stars == self.stars:
-                    child.style = discord.ButtonStyle.success
-                else:
-                    child.style = discord.ButtonStyle.secondary
+                child.style = discord.ButtonStyle.success if child.stars == self.stars else discord.ButtonStyle.secondary
 
         await interaction.response.edit_message(view=view)
 
-        # Determine message based on comment and image status
         has_comment = bool(view.comment_text)
         has_image = bool(view.image_url)
 
         if not has_comment and not has_image:
-            # Only star exists
             embed = discord.Embed(
                 title="⭐ Star Recorded",
                 description=f"You selected **{self.stars} star(s)**.\n\n"
@@ -494,7 +486,6 @@ class StarButton(Button):
                 color=SUCCESS_COLOR
             )
         elif has_comment and not has_image:
-            # Star + comment exist
             embed = discord.Embed(
                 title=f"{EMOJI_CHECK} Rating & Review Recorded",
                 description=f"Your star rating and review have both been recorded.\n\n"
@@ -503,7 +494,6 @@ class StarButton(Button):
                 color=SUCCESS_COLOR
             )
         elif not has_comment and has_image:
-            # Star + image exist
             embed = discord.Embed(
                 title=f"{EMOJI_CHECK} Rating & Image Recorded",
                 description=f"Your star rating and proof image have both been recorded.\n\n"
@@ -512,7 +502,6 @@ class StarButton(Button):
                 color=SUCCESS_COLOR
             )
         else:
-            # Star + comment + image exist
             embed = discord.Embed(
                 title=f"{EMOJI_CHECK} Everything Recorded",
                 description=f"Your star rating, review, and proof image have all been recorded.\n\n"
@@ -520,7 +509,7 @@ class StarButton(Button):
                 color=SUCCESS_COLOR
             )
         
-        await view.send_temporary_followup(interaction, embed=embed)
+        await view._send_temporary(interaction, embed=embed)
 
 
 class CommentModal(Modal, title="Add Review Comment"):
@@ -531,7 +520,6 @@ class CommentModal(Modal, title="Add Review Comment"):
         self.view = view
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Security Check
         if interaction.user.id != self.view.author.id:
             await interaction.response.send_message(
                 embed=create_error_embed(f"Access Denied", "Only the designated buyer can add comments."),
@@ -541,12 +529,10 @@ class CommentModal(Modal, title="Add Review Comment"):
 
         self.view.comment_text = self.comment_input.value.strip()
         
-        # Determine message based on star and image status
         has_star = self.view.selected_stars is not None
         has_image = bool(self.view.image_url)
 
         if not has_star and not has_image:
-            # Only comment exists
             embed = discord.Embed(
                 title="💬 Review Recorded",
                 description=f"Your review has been recorded successfully.\n\n"
@@ -557,7 +543,6 @@ class CommentModal(Modal, title="Add Review Comment"):
                 color=SUCCESS_COLOR
             )
         elif has_star and not has_image:
-            # Comment + star exist
             embed = discord.Embed(
                 title=f"{EMOJI_CHECK} Rating & Review Recorded",
                 description=f"Your review and star rating have both been recorded.\n\n"
@@ -566,7 +551,6 @@ class CommentModal(Modal, title="Add Review Comment"):
                 color=SUCCESS_COLOR
             )
         elif not has_star and has_image:
-            # Comment + image exist
             embed = discord.Embed(
                 title=f"🖼️ Review & Image Recorded",
                 description=f"Your review and proof image have both been recorded.\n\n"
@@ -575,7 +559,6 @@ class CommentModal(Modal, title="Add Review Comment"):
                 color=SUCCESS_COLOR
             )
         else:
-            # Comment + star + image exist
             embed = discord.Embed(
                 title=f"{EMOJI_CHECK} Everything Recorded",
                 description=f"Your review, star rating, and proof image have all been recorded.\n\n"
@@ -583,7 +566,7 @@ class CommentModal(Modal, title="Add Review Comment"):
                 color=SUCCESS_COLOR
             )
         
-        await self.view.send_temporary_ephemeral(interaction, embed=embed)
+        await self.view._send_temporary(interaction, embed=embed)
 
 
 def create_vouch_settings_embed(guild_id: str) -> discord.Embed:
@@ -840,7 +823,7 @@ class RemoveItemModal(Modal, title="Remove Item"):
 
 class TraderVouchView(View):
     def __init__(self, bot: commands.Bot, seller: discord.Member, item: str, author: discord.Member):
-        super().__init__(timeout=300.0)  # 5 minutes timeout
+        super().__init__(timeout=300.0)
         self.bot = bot
         self.seller = seller
         self.item = item
@@ -849,14 +832,13 @@ class TraderVouchView(View):
         self.comment_text: str = ""
         self.image_url: Optional[str] = None
         self.message: Optional[discord.Message] = None
-        self.submitted = False  # Flag to prevent double submission
-        self._lock = asyncio.Lock()  # Fix: Add lock to prevent race condition
+        self.submitted = False
+        self._lock = asyncio.Lock()
         
-        # Add star buttons
         for i in range(1, 6):
             self.add_item(StarButton(i))
 
-    async def send_temporary_ephemeral(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
+    async def _send_temporary(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
         """Send an ephemeral message that auto-deletes after 5 seconds."""
         if not interaction.response.is_done():
             if content is not None:
@@ -877,22 +859,7 @@ class TraderVouchView(View):
         except discord.HTTPException:
             pass
 
-    async def send_temporary_followup(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
-        """Send a temporary ephemeral followup that auto-deletes after 5 seconds."""
-        if content is not None:
-            msg = await interaction.followup.send(content, ephemeral=True)
-        elif embed is not None:
-            msg = await interaction.followup.send(embed=embed, ephemeral=True)
-        else:
-            return
-        try:
-            await asyncio.sleep(5)
-            await msg.delete()
-        except discord.HTTPException:
-            pass
-
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        # Global check for the whole view
         if interaction.user.id != self.author.id:
             await interaction.response.send_message(
                 embed=create_error_embed(f"Access Denied", "Only the designated buyer can interact with this session."),
@@ -916,17 +883,17 @@ class TraderVouchView(View):
     @discord.ui.button(label="Add Comment", style=discord.ButtonStyle.blurple, emoji=EMOJI_COMMENT, row=1)
     async def add_comment_btn(self, interaction: discord.Interaction, button: Button):
         if self.submitted:
-            await self.send_temporary_ephemeral(interaction, content="This session is already completed.")
+            await self._send_temporary(interaction, content="This session is already completed.")
             return
         await interaction.response.send_modal(CommentModal(self))
 
     @discord.ui.button(label="Add Image Proof", style=discord.ButtonStyle.secondary, emoji=EMOJI_IMAGE, row=1)
     async def add_image_btn(self, interaction: discord.Interaction, button: Button):
         if self.submitted:
-            await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Session Completed", "This session is already completed."))
+            await self._send_temporary(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Session Completed", "This session is already completed."))
             return
         
-        await self.send_temporary_ephemeral(interaction, embed=discord.Embed(
+        await self._send_temporary(interaction, embed=discord.Embed(
                 title="🖼️ Upload Proof Image",
                 description="Please upload **one image attachment** in this channel within **5 minutes**.\n\n"
                             "• Only image files are allowed.\n"
@@ -944,17 +911,15 @@ class TraderVouchView(View):
                 timeout=300.0
             )
             
-            # Validate number of attachments
             if len(message.attachments) != 1:
                 error_title = f"{EMOJI_CROSS} Too Many Attachments" if len(message.attachments) > 1 else f"{EMOJI_CROSS} No Attachment Found"
                 error_desc = "Please upload exactly one image." if len(message.attachments) > 1 else "No attachment was found. Please click on **Add Image Proof** button and upload image file."
-                await self.send_temporary_followup(interaction, embed=create_error_embed(error_title, error_desc))
+                await self._send_temporary(interaction, embed=create_error_embed(error_title, error_desc))
                 return
             
             attachment = message.attachments[0]
-            # Validate image content type
             if not (attachment.content_type and attachment.content_type.startswith("image/")):
-                await self.send_temporary_followup(interaction, embed=create_error_embed(
+                await self._send_temporary(interaction, embed=create_error_embed(
                         f"{EMOJI_CROSS} Invalid Attachment",
                         "Please upload one valid image file (PNG, JPG, JPEG, or WEBP)."
                     ))
@@ -962,12 +927,10 @@ class TraderVouchView(View):
             
             self.image_url = attachment.url
             
-            # Determine success message based on current state
             has_star = self.selected_stars is not None
             has_comment = bool(self.comment_text)
             
             if not has_star and not has_comment:
-                # Case A — Image uploaded first
                 embed = discord.Embed(
                     title="🖼️ Proof Image Recorded",
                     description="Your proof image has been attached successfully.\n\n"
@@ -978,7 +941,6 @@ class TraderVouchView(View):
                     color=SUCCESS_COLOR
                 )
             elif has_star and not has_comment:
-                # Case B — Image uploaded after selecting a star only
                 embed = discord.Embed(
                     title=f"{EMOJI_CHECK} Rating & Image Recorded",
                     description="Your star rating and proof image have both been recorded.\n\n"
@@ -987,7 +949,6 @@ class TraderVouchView(View):
                     color=SUCCESS_COLOR
                 )
             elif not has_star and has_comment:
-                # Case C — Image uploaded after adding a comment only
                 embed = discord.Embed(
                     title="🖼️ Review & Image Recorded",
                     description="Your review and proof image have both been recorded.\n\n"
@@ -996,7 +957,6 @@ class TraderVouchView(View):
                     color=SUCCESS_COLOR
                 )
             else:
-                # Case D — Image uploaded after both star and comment exist
                 embed = discord.Embed(
                     title=f"{EMOJI_CHECK} Rating, Review & Image Recorded",
                     description="Your star rating, review, and proof image have all been recorded.\n\n"
@@ -1004,10 +964,10 @@ class TraderVouchView(View):
                     color=SUCCESS_COLOR
                 )
             
-            await self.send_temporary_followup(interaction, embed=embed)
+            await self._send_temporary(interaction, embed=embed)
             
         except asyncio.TimeoutError:
-            await self.send_temporary_followup(interaction, embed=create_error_embed(
+            await self._send_temporary(interaction, embed=create_error_embed(
                     f"{EMOJI_CLOCK} Image Upload Timed Out",
                     "No image was uploaded within 5 minutes.\n\n"
                     "You may still complete and submit your vouch without attaching a proof image."
@@ -1015,18 +975,15 @@ class TraderVouchView(View):
 
     @discord.ui.button(label="Submit Vouch", style=discord.ButtonStyle.green, emoji=EMOJI_VOUCH, row=1)
     async def submit_btn(self, interaction: discord.Interaction, button: Button):
-        # Fix: Use lock to prevent race condition
         async with self._lock:
-            # Loophole Fix: Prevent double submission
             if self.submitted:
-                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Already Submitted", "This vouch has already been processed."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Already Submitted", "This vouch has already been processed."))
                 return
 
             if self.selected_stars is None:
-                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Missing Rating", "Please select a star rating before submitting."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Missing Rating", "Please select a star rating before submitting."))
                 return
 
-            # Mark as submitted immediately to block concurrent clicks
             self.submitted = True
 
             guild = interaction.guild
@@ -1035,23 +992,19 @@ class TraderVouchView(View):
 
             vouch_channel_id = get_vouch_channel(str(guild.id))
             if not vouch_channel_id:
-                # Reset flag if config error occurs so admin can fix it and retry?
-                # Better to fail hard on config error.
                 self.submitted = False
-                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Not Configured", "Vouch channel not configured."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Not Configured", "Vouch channel not configured."))
                 return
 
             vouch_channel = guild.get_channel(vouch_channel_id)
             if not vouch_channel:
                 self.submitted = False
-                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Channel Missing", "Configured channel not found."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Channel Missing", "Configured channel not found."))
                 return
 
-            # Process Vouch (Server-Specific ID)
             vouch_id = get_server_vouch_count(str(self.seller.id), str(guild.id)) + 1
             add_vouch(str(self.seller.id), 1)
 
-            # Save to history with guild_id
             add_vouch_history(str(self.seller.id), {
                 "vouch_id": vouch_id,
                 "customer": str(self.author.id),
@@ -1077,7 +1030,6 @@ class TraderVouchView(View):
             try:
                 await vouch_channel.send(embed=vouch_embed)
 
-                # Disable view permanently
                 for child in self.children:
                     child.disabled = True
 
@@ -1085,18 +1037,17 @@ class TraderVouchView(View):
                 if self.message:
                     await self.message.edit(view=self, content=success_msg)
 
-                # Final success message - DO NOT auto-delete
                 await interaction.response.send_message(
                     embed=create_success_embed(f"Success", "The vouch has been posted to the vouch channel."),
                     ephemeral=True
                 )
 
             except discord.Forbidden:
-                self.submitted = False  # Allow retry if permission error was temporary (unlikely) or just log it
-                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."))
+                self.submitted = False
+                await self._send_temporary(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."))
             except discord.HTTPException:
                 self.submitted = False
-                await self.send_temporary_ephemeral(interaction, embed=create_error_embed(f"Send Error", "Failed to send message."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Send Error", "Failed to send message."))
 
 
 # =============================================================================
