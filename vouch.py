@@ -540,9 +540,10 @@ class CommentModal(Modal, title="Add Review Comment"):
 
 
 class CooldownModal(Modal, title="Set Vouch Cooldown"):
-    def __init__(self, guild_id: str):
+    def __init__(self, guild_id: str, setting_view: Optional[VouchSettingView] = None):
         super().__init__()
         self.guild_id = guild_id
+        self.setting_view = setting_view
         current_cooldown_minutes = get_server_cooldown(guild_id) // 60
         self.cooldown_input = TextInput(
             label="Cooldown (minutes)",
@@ -571,57 +572,84 @@ class CooldownModal(Modal, title="Set Vouch Cooldown"):
             return
 
         set_server_cooldown(self.guild_id, cooldown_minutes)
-        embed = discord.Embed(
-            title=f"{EMOJI_CHECK} Cooldown Updated",
-            description=f"The vouch cooldown has been set to **{cooldown_minutes} minutes**.",
-            color=SUCCESS_COLOR
-        )
-        await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True
-        )
+        
+        # Update the settings embed in place if we have a reference to it
+        if self.setting_view and self.setting_view.original_message:
+            embed = self.setting_view.original_message.embeds[0].copy()
+            # Find and update the Cooldown line in description
+            desc_lines = embed.description.split("\n")
+            for i, line in enumerate(desc_lines):
+                if "**Current Cooldown:**" in line:
+                    desc_lines[i] = f"{EMOJI_CLOCK} **Current Cooldown:** {cooldown_minutes} minutes"
+                    break
+            embed.description = "\n".join(desc_lines)
+            await self.setting_view.original_message.edit(embed=embed)
+            await interaction.response.defer()
+        else:
+            embed = discord.Embed(
+                title=f"{EMOJI_CHECK} Cooldown Updated",
+                description=f"The vouch cooldown has been set to **{cooldown_minutes} minutes**.",
+                color=SUCCESS_COLOR
+            )
+            await interaction.response.send_message(
+                embed=embed,
+                ephemeral=True
+            )
 
 
 class VouchSettingView(View):
-    def __init__(self, guild_id: str):
+    def __init__(self, guild_id: str, original_message: Optional[discord.Message] = None):
         super().__init__(timeout=300.0)  # 5 minutes timeout
         self.guild_id = guild_id
+        self.original_message = original_message
+        
+        # Set initial button state based on current vouch status
+        vouch_enabled = is_vouch_enabled(guild_id)
+        self.toggle_vouch_btn.style = discord.ButtonStyle.green if vouch_enabled else discord.ButtonStyle.red
 
     @discord.ui.button(label="Add Item", style=discord.ButtonStyle.green, emoji=EMOJI_CART)
     async def add_item_btn(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.send_modal(AddItemModal(self.guild_id))
+        await interaction.response.send_modal(AddItemModal(self.guild_id, self))
 
     @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red, emoji=EMOJI_TAG)
     async def remove_item_btn(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.send_modal(RemoveItemModal(self.guild_id))
+        await interaction.response.send_modal(RemoveItemModal(self.guild_id, self))
 
     @discord.ui.button(label="Set Cooldown", style=discord.ButtonStyle.blurple, emoji=EMOJI_CLOCK)
     async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.send_modal(CooldownModal(self.guild_id))
+        await interaction.response.send_modal(CooldownModal(self.guild_id, self))
 
-    @discord.ui.button(label="Disable Vouching", style=discord.ButtonStyle.red, emoji=EMOJI_SETTING)
+    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green, emoji=EMOJI_SETTING)
     async def toggle_vouch_btn(self, interaction: discord.Interaction, button: Button):
         current_enabled = is_vouch_enabled(self.guild_id)
         new_state = not current_enabled
         set_vouch_enabled(self.guild_id, new_state)
         
-        state_text = "enabled" if new_state else "disabled"
+        # Update button appearance
         button.style = discord.ButtonStyle.green if new_state else discord.ButtonStyle.red
-        button.label = "Disable Vouching" if new_state else "Enable Vouching"
         
-        embed = discord.Embed(
-            title=f"{EMOJI_CHECK} Vouch System Updated",
-            description=f"The vouch system has been **{state_text}** for this server.",
-            color=SUCCESS_COLOR if new_state else ERROR_COLOR
-        )
-        
-        await interaction.response.edit_message(view=self, embed=embed)
+        # Update the embed in place
+        if self.original_message:
+            embed = self.original_message.embeds[0].copy()
+            enabled_status = f"{EMOJI_CHECK} Enabled" if new_state else f"{EMOJI_CROSS} Disabled"
+            # Find and update the Vouch System line in description
+            desc_lines = embed.description.split("\n")
+            for i, line in enumerate(desc_lines):
+                if "**Vouch System:**" in line:
+                    desc_lines[i] = f"{EMOJI_SETTING} **Vouch System:** {enabled_status}"
+                    break
+            embed.description = "\n".join(desc_lines)
+            await self.original_message.edit(embed=embed, view=self)
+            await interaction.response.defer()
+        else:
+            await interaction.response.defer()
 
 
 class AddItemModal(Modal, title="Add New Item"):
-    def __init__(self, guild_id: str):
+    def __init__(self, guild_id: str, setting_view: Optional[VouchSettingView] = None):
         super().__init__()
         self.guild_id = guild_id
+        self.setting_view = setting_view
         self.item_name_input = TextInput(
             label="Item Name",
             placeholder="Enter the item name...",
@@ -649,10 +677,23 @@ class AddItemModal(Modal, title="Add New Item"):
                 value=item_name,
                 inline=False
             )
-            await interaction.response.send_message(
-                embed=embed,
-                ephemeral=True
-            )
+            
+            # Update the settings embed in place if we have a reference to it
+            if self.setting_view and self.setting_view.original_message:
+                settings_embed = self.setting_view.original_message.embeds[0].copy()
+                # Update the footer with new item count
+                total_items = len(get_items(self.guild_id))
+                settings_embed.set_footer(text=f"📦 Registered Items: {total_items}")
+                await self.setting_view.original_message.edit(embed=settings_embed)
+                await interaction.response.send_message(
+                    embed=embed,
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    embed=embed,
+                    ephemeral=True
+                )
         else:
             embed = discord.Embed(
                 title="⚠️ Duplicate Item",
@@ -666,9 +707,10 @@ class AddItemModal(Modal, title="Add New Item"):
 
 
 class RemoveItemModal(Modal, title="Remove Item"):
-    def __init__(self, guild_id: str):
+    def __init__(self, guild_id: str, setting_view: Optional[VouchSettingView] = None):
         super().__init__()
         self.guild_id = guild_id
+        self.setting_view = setting_view
         self.item_code_input = TextInput(
             label="Item Code",
             placeholder="Enter the item code number...",
@@ -722,10 +764,23 @@ class RemoveItemModal(Modal, title="Remove Item"):
                 value=item_name,
                 inline=False
             )
-            await interaction.response.send_message(
-                embed=embed,
-                ephemeral=True
-            )
+            
+            # Update the settings embed in place if we have a reference to it
+            if self.setting_view and self.setting_view.original_message:
+                settings_embed = self.setting_view.original_message.embeds[0].copy()
+                # Update the footer with new item count
+                total_items = len(get_items(self.guild_id))
+                settings_embed.set_footer(text=f"📦 Registered Items: {total_items}")
+                await self.setting_view.original_message.edit(embed=settings_embed)
+                await interaction.response.send_message(
+                    embed=embed,
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(
+                    embed=embed,
+                    ephemeral=True
+                )
         else:
             embed = discord.Embed(
                 title="⚠️ Removal Failed",
@@ -1306,20 +1361,23 @@ class Vouch(commands.Cog):
             return
 
         guild_id = str(interaction.guild.id)
-        view = VouchSettingView(guild_id)
         
         current_cooldown_minutes = get_server_cooldown(guild_id) // 60
         vouch_enabled = is_vouch_enabled(guild_id)
-        enabled_status = "✅ Enabled" if vouch_enabled else "❌ Disabled"
+        enabled_status = f"{EMOJI_CHECK} Enabled" if vouch_enabled else f"{EMOJI_CROSS} Disabled"
 
         embed = discord.Embed(
             title=f"{EMOJI_CART} Vouch Settings",
             description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes\n{EMOJI_SETTING} **Vouch System:** {enabled_status}",
             color=VOUCH_COLOR
         )
-        embed.set_footer(text="These buttons expire in 5 minutes")
+        total_items = len(get_items(guild_id))
+        embed.set_footer(text=f"📦 Registered Items: {total_items}")
 
-        await interaction.response.send_message(embed=embed, view=view)
+        view = VouchSettingView(guild_id)
+        response = await interaction.response.send_message(embed=embed, view=view)
+        # Store reference to the original message for in-place edits
+        view.original_message = await response.original_response()
 
 
     @app_commands.command(name="listitems", description="View all registered items for this server")
