@@ -838,8 +838,8 @@ class TraderVouchView(View):
         for i in range(1, 6):
             self.add_item(StarButton(i))
 
-    async def _send_temporary(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
-        """Send an ephemeral message that auto-deletes after 5 seconds."""
+    async def _send_temporary(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None, delete_after: float = 5.0):
+        """Send an ephemeral message that auto-deletes after specified seconds (default 5)."""
         try:
             if not interaction.response.is_done():
                 if content is not None:
@@ -854,11 +854,13 @@ class TraderVouchView(View):
                     msg = await interaction.followup.send(embed=embed, ephemeral=True, wait=True)
                 else:
                     return
-            try:
-                await asyncio.sleep(5)
-                await msg.delete()
-            except discord.HTTPException:
-                pass
+            
+            if delete_after > 0:
+                await asyncio.sleep(delete_after)
+                try:
+                    await msg.delete()
+                except discord.HTTPException:
+                    pass
         except discord.HTTPException:
             # Interaction is dead/expired, fail silently
             pass
@@ -988,6 +990,9 @@ class TraderVouchView(View):
                 await self._send_temporary(interaction, embed=create_error_embed(f"Missing Rating", "Please select a star rating before submitting."))
                 return
 
+            # Defer immediately to prevent interaction timeout during processing
+            await interaction.response.defer(ephemeral=True)
+
             self.submitted = True
 
             guild = interaction.guild
@@ -997,13 +1002,13 @@ class TraderVouchView(View):
             vouch_channel_id = get_vouch_channel(str(guild.id))
             if not vouch_channel_id:
                 self.submitted = False
-                await self._send_temporary(interaction, embed=create_error_embed(f"Not Configured", "Vouch channel not configured."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Not Configured", "Vouch channel not configured."), delete_after=0)
                 return
 
             vouch_channel = guild.get_channel(vouch_channel_id)
             if not vouch_channel:
                 self.submitted = False
-                await self._send_temporary(interaction, embed=create_error_embed(f"Channel Missing", "Configured channel not found."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Channel Missing", "Configured channel not found."), delete_after=0)
                 return
 
             vouch_id = get_server_vouch_count(str(self.seller.id), str(guild.id)) + 1
@@ -1041,18 +1046,19 @@ class TraderVouchView(View):
                 if self.message:
                     await self.message.edit(view=self, content=success_msg)
 
-                # FINAL SUCCESS MESSAGE - DO NOT AUTO-DELETE
+                # FINAL SUCCESS MESSAGE - DO NOT AUTO-DELETE (delete_after=0)
                 await interaction.followup.send(
                     embed=create_success_embed(f"Success", "The vouch has been posted to the vouch channel."),
                     ephemeral=True
                 )
+                # Don't delete the success message - just leave it
 
             except discord.Forbidden:
                 self.submitted = False
-                await self._send_temporary(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "Cannot send messages in vouch channel."), delete_after=0)
             except discord.HTTPException:
                 self.submitted = False
-                await self._send_temporary(interaction, embed=create_error_embed(f"Send Error", "Failed to send message."))
+                await self._send_temporary(interaction, embed=create_error_embed(f"Send Error", "Failed to send message."), delete_after=0)
 
 
 # =============================================================================
