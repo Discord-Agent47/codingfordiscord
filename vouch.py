@@ -840,23 +840,27 @@ class TraderVouchView(View):
 
     async def _send_temporary(self, interaction: discord.Interaction, content: Optional[str] = None, embed: Optional[discord.Embed] = None):
         """Send an ephemeral message that auto-deletes after 5 seconds."""
-        if not interaction.response.is_done():
-            if content is not None:
-                await interaction.response.send_message(content, ephemeral=True)
-            elif embed is not None:
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-            msg = await interaction.original_response()
-        else:
-            if content is not None:
-                msg = await interaction.followup.send(content, ephemeral=True)
-            elif embed is not None:
-                msg = await interaction.followup.send(embed=embed, ephemeral=True)
-            else:
-                return
         try:
-            await asyncio.sleep(5)
-            await msg.delete()
+            if not interaction.response.is_done():
+                if content is not None:
+                    await interaction.response.send_message(content, ephemeral=True)
+                elif embed is not None:
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                msg = await interaction.original_response()
+            else:
+                if content is not None:
+                    msg = await interaction.followup.send(content, ephemeral=True, wait=True)
+                elif embed is not None:
+                    msg = await interaction.followup.send(embed=embed, ephemeral=True, wait=True)
+                else:
+                    return
+            try:
+                await asyncio.sleep(5)
+                await msg.delete()
+            except discord.HTTPException:
+                pass
         except discord.HTTPException:
+            # Interaction is dead/expired, fail silently
             pass
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -1037,7 +1041,8 @@ class TraderVouchView(View):
                 if self.message:
                     await self.message.edit(view=self, content=success_msg)
 
-                await interaction.response.send_message(
+                # FINAL SUCCESS MESSAGE - DO NOT AUTO-DELETE
+                await interaction.followup.send(
                     embed=create_success_embed(f"Success", "The vouch has been posted to the vouch channel."),
                     ephemeral=True
                 )
