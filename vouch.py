@@ -1107,22 +1107,21 @@ class ItemListView(View):
         page_items = self.items[start_idx:end_idx]
 
         embed = discord.Embed(
-            title=f"{EMOJI_CART} Server Registered Item List",
-            description=f"{EMOJI_CART} Registered Items",
+            title="🛒 Registered Items",
             color=VOUCH_COLOR
         )
 
         if not page_items:
-            embed.add_field(name="No Items", value="No custom items registered yet.", inline=False)
+            embed.description = "No items registered yet."
         else:
             items_text = ""
             for item in page_items:
-                items_text += f"{EMOJI_TAG} Item #{item['code']:03d}\n{item['name']}\n\n"
-            embed.description = f"{EMOJI_CART} Registered Items\n\n{items_text}"
+                items_text += f"🏷️ `#{item['code']:03d}` • {item['name']}\n"
+            embed.description = items_text
 
-        # Add separator and footer info
+        # Add footer with total items and page info
         total_items = len(self.items)
-        footer_text = f"━━━━━━━━━━━━━━━━━━━━\n\n📦 Registered Items: {total_items}\n\n💡 Manage your item list anytime through `/vouchsettings`.\n\nPage {self.current_page + 1}/{self.total_pages}"
+        footer_text = f"📦 {total_items} Registered Items • Page {self.current_page + 1}/{self.total_pages}\n💡 Use `/vouchsetting` to manage items."
         
         embed.set_footer(text=footer_text)
         return embed
