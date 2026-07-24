@@ -1107,33 +1107,32 @@ class ItemListView(View):
         page_items = self.items[start_idx:end_idx]
 
         embed = discord.Embed(
-            title="🛒 Registered Items",
+            title=f"{EMOJI_CART} Registered Items",
             color=VOUCH_COLOR
         )
 
         if not page_items:
-            embed.description = "No items registered yet."
+            embed.description = f"{EMOJI_TAG} No items registered yet.\n\nUse `/vouchsetting` to add items to your server."
         else:
             items_text = ""
             for item in page_items:
-                items_text += f"🏷️ `#{item['code']:03d}` • {item['name']}\n"
+                items_text += f"{EMOJI_TAG} `#{item['code']:03d}` • {item['name']}\n"
             embed.description = items_text
 
-        # Add footer with total items and page info
         total_items = len(self.items)
-        footer_text = f"📦 {total_items} Registered Items • Page {self.current_page + 1}/{self.total_pages}\n💡 Use `/vouchsetting` to manage items."
+        footer_text = f"{total_items} Registered Items • Page {self.current_page + 1}/{self.total_pages}"
         
         embed.set_footer(text=footer_text)
         return embed
 
-    @discord.ui.button(label="Previous", style=discord.ButtonStyle.gray, emoji="⬅️")
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple)
     async def prev_button(self, interaction: discord.Interaction, button: Button):
         if self.current_page > 0:
             self.current_page -= 1
             self.update_buttons()
             await interaction.response.edit_message(embed=self.get_page_embed(), view=self)
 
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.gray, emoji="➡️")
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple)
     async def next_button(self, interaction: discord.Interaction, button: Button):
         if self.current_page < self.total_pages - 1:
             self.current_page += 1
