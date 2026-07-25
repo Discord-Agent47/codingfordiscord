@@ -4,77 +4,29 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View, Select
-from discord import PartialEmoji
 
-# Custom emoji definitions - ID only
-EMOJI_VOUCH_ID = 1529207144162005215
-EMOJI_CART_ID = 1529206909465399426
-EMOJI_SELLER_ID = 1529206906437107995
-EMOJI_STAR_ID = 1529207360277577798
-EMOJI_COMMENT_ID = 1530394172689879302
-EMOJI_SEARCH_ID = 1529206901831893163
-EMOJI_TAG_ID = 1529206892486721687
-EMOJI_CLOCK_ID = 1529206889844314282
-EMOJI_ARROW_ID = 1529856775103320064
-EMOJI_CROSS_ID = 1529485828672323684
-EMOJI_CHECK_ID = 1529549227770908803
-EMOJI_SETTING_ID = 1529205660357980210
-EMOJI_RANK_ID = 1529733245032464454
-EMOJI_STATS_ID = 1529852489896169603
-EMOJI_REVIEW_ID = 1529853305008689242
-EMOJI_IMAGE_ID = 1529866936249487491
-EMOJI_REQUEST_ID = 1530395499323064530
-EMOJI_INFO_ID = 1530613793850130494
-EMOJI_ADMIN_ID = 1530614195186307142
-EMOJI_CHANNEL_ID = 1530613700028010698
-EMOJI_LIST_ID = 1530613479713673436
-
-# PartialEmoji objects for use in Select options (emoji parameter requires PartialEmoji)
-# For custom server emojis, only the ID is needed - name should be None so Discord validates it
-EMOJI_VOUCH = PartialEmoji(name=None, id=EMOJI_VOUCH_ID, animated=True)
-EMOJI_CART = PartialEmoji(name=None, id=EMOJI_CART_ID)
-EMOJI_SELLER = PartialEmoji(name=None, id=EMOJI_SELLER_ID)
-EMOJI_STAR = PartialEmoji(name=None, id=EMOJI_STAR_ID)
-EMOJI_COMMENT = PartialEmoji(name=None, id=EMOJI_COMMENT_ID)
-EMOJI_SEARCH = PartialEmoji(name=None, id=EMOJI_SEARCH_ID)
-EMOJI_TAG = PartialEmoji(name=None, id=EMOJI_TAG_ID)
-EMOJI_CLOCK = PartialEmoji(name=None, id=EMOJI_CLOCK_ID)
-EMOJI_ARROW = PartialEmoji(name=None, id=EMOJI_ARROW_ID)
-EMOJI_CROSS = PartialEmoji(name=None, id=EMOJI_CROSS_ID)
-EMOJI_CHECK = PartialEmoji(name=None, id=EMOJI_CHECK_ID)
-EMOJI_SETTING = PartialEmoji(name=None, id=EMOJI_SETTING_ID)
-EMOJI_RANK = PartialEmoji(name=None, id=EMOJI_RANK_ID)
-EMOJI_STATS = PartialEmoji(name=None, id=EMOJI_STATS_ID)
-EMOJI_REVIEW = PartialEmoji(name=None, id=EMOJI_REVIEW_ID)
-EMOJI_IMAGE = PartialEmoji(name=None, id=EMOJI_IMAGE_ID)
-EMOJI_REQUEST = PartialEmoji(name=None, id=EMOJI_REQUEST_ID)
-EMOJI_INFO = PartialEmoji(name=None, id=EMOJI_INFO_ID)
-EMOJI_ADMIN = PartialEmoji(name=None, id=EMOJI_ADMIN_ID)
-EMOJI_CHANNEL = PartialEmoji(name=None, id=EMOJI_CHANNEL_ID)
-EMOJI_LIST = PartialEmoji(name=None, id=EMOJI_LIST_ID)
-
-# String representations for use in embed titles/descriptions
-E_VOUCH = f"<a:Laptop:{EMOJI_VOUCH_ID}>"
-E_CART = f"<:Cart:{EMOJI_CART_ID}>"
-E_SELLER = f"<:Seller:{EMOJI_SELLER_ID}>"
-E_STAR = f"<:Star:{EMOJI_STAR_ID}>"
-E_COMMENT = f"<:Review_Msg:{EMOJI_COMMENT_ID}>"
-E_SEARCH = f"<:Search:{EMOJI_SEARCH_ID}>"
-E_TAG = f"<:Tag:{EMOJI_TAG_ID}>"
-E_CLOCK = f"<:Clock:{EMOJI_CLOCK_ID}>"
-E_ARROW = f"<:Arrow_GG:{EMOJI_ARROW_ID}>"
-E_CROSS = f"<:Cross:{EMOJI_CROSS_ID}>"
-E_CHECK = f"<:Check:{EMOJI_CHECK_ID}>"
-E_SETTING = f"<:Setting:{EMOJI_SETTING_ID}>"
-E_RANK = f"<:Rank:{EMOJI_RANK_ID}>"
-E_STATS = f"<:Stats:{EMOJI_STATS_ID}>"
-E_REVIEW = f"<:Review:{EMOJI_REVIEW_ID}>"
-E_IMAGE = f"<:Image:{EMOJI_IMAGE_ID}>"
-E_REQUEST = f"<:Request:{EMOJI_REQUEST_ID}>"
-E_INFO = f"<:Info:{EMOJI_INFO_ID}>"
-E_ADMIN = f"<:Admin:{EMOJI_ADMIN_ID}>"
-E_CHANNEL = f"<:Channel:{EMOJI_CHANNEL_ID}>"
-E_LIST = f"<:List:{EMOJI_LIST_ID}>"
+# Custom emoji definitions - String format for embeds
+EMOJI_VOUCH = "<a:Laptop:1529207144162005215>"
+EMOJI_CART = "<:Cart:1529206909465399426>"
+EMOJI_SELLER = "<:Seller:1529206906437107995>"
+EMOJI_STAR = "<:Star:1529207360277577798>"
+EMOJI_COMMENT = "<:Review_Msg:1530394172689879302>"
+EMOJI_SEARCH = "<:Search:1529206901831893163>"
+EMOJI_TAG = "<:Tag:1529206892486721687>"
+EMOJI_CLOCK = "<:Clock:1529206889844314282>"
+EMOJI_ARROW = "<:Arrow_GG:1529856775103320064>"
+EMOJI_CROSS = "<:Cross:1529485828672323684>"
+EMOJI_CHECK = "<:Check:1529549227770908803>"
+EMOJI_SETTING = "<:Setting:1529205660357980210>"
+EMOJI_RANK = "<:Rank:1529733245032464454>"
+EMOJI_STATS = "<:Stats:1529852489896169603>"
+EMOJI_REVIEW = "<:Review:1529853305008689242>"
+EMOJI_IMAGE = "<:Image:1529866936249487491>"
+EMOJI_REQUEST = "<:Request:1530395499323064530>"
+EMOJI_INFO = "<:Info:1530613793850130494>"
+EMOJI_ADMIN = "<:Admin:1530614195186307142>"
+EMOJI_CHANNEL = "<:Channel:1530613700028010698>"
+EMOJI_LIST = "<:List:1530613479713673436>"
 
 FOOTER_TEXT = "Vouch System Help • User Support"
 
@@ -87,37 +39,37 @@ class HelpSelect(Select):
             discord.SelectOption(
                 label="Vouch Command",
                 description="Submit a vouch for a service",
-                emoji=EMOJI_VOUCH,
+                emoji="📝",
                 value="vouch"
             ),
             discord.SelectOption(
                 label="Vouch Stats",
                 description="View vouch statistics for a user",
-                emoji=EMOJI_STATS,
+                emoji="📊",
                 value="vouchstats"
             ),
             discord.SelectOption(
                 label="Trader Vouch",
                 description="Admin tool to facilitate a vouch",
-                emoji=EMOJI_REQUEST,
+                emoji="🤝",
                 value="tradervouch"
             ),
             discord.SelectOption(
                 label="Vouch Setup",
                 description="Configure the vouch channel",
-                emoji=EMOJI_CHANNEL,
+                emoji="📢",
                 value="vouchsetup"
             ),
             discord.SelectOption(
                 label="Vouch Settings",
                 description="Manage server items & cooldown",
-                emoji=EMOJI_SETTING,
+                emoji="⚙️",
                 value="vouchsetting"
             ),
             discord.SelectOption(
                 label="List Items",
                 description="View all registered items",
-                emoji=EMOJI_LIST,
+                emoji="📋",
                 value="listitems"
             ),
         ]
