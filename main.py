@@ -3,7 +3,6 @@ import os
 import sys
 import logging
 import traceback
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Any
@@ -12,6 +11,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
+
+# Import command mentions utility
+from utils.command_mentions import get_command_mentions
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,7 +29,6 @@ class Config:
     BOT_PREFIX: str = os.getenv('BOT_PREFIX', '!')
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO').upper()
     COGS_DIRECTORY: Path = Path('./cogs')
-    COMMANDS_JSON_FILE: Path = Path('./registered_commands.json')
 
     # Validation
     @classmethod
@@ -167,231 +168,25 @@ class ProfessionalBot(commands.Bot):
             self.logger.error(f"❌ Failed to sync application commands: {e}")
             raise BotInitializationError(f"Command sync failed: {e}")
 
-        # Export registered slash commands
-        await self._export_slash_commands()
+        # Update command mentions from the synced commands
+        await self._update_command_mentions()
 
         self.logger.info("=" * 60)
         self.logger.info("✨ Bot initialization complete!")
         self.logger.info("=" * 60)
 
-    async def _export_slash_commands(self) -> None:
+    async def _update_command_mentions(self) -> None:
         """
-        Export all registered slash commands to a JSON file and print them
-        in a copyable format.
+        Update command mentions from the bot's registered commands.
+        
+        This method uses the command_mentions utility to automatically
+        generate and store all slash command mentions in a JSON file.
         """
-        self.logger.info("📋 Exporting registered slash commands...")
-
-        commands_list = []
-
         try:
-            # Fetch the actual application commands from Discord to get their IDs
-            # This is necessary because tree.get_commands() doesn't include IDs
-            app_commands = await self.tree.fetch_commands()
-
-            # Create a mapping of command name to ID
-            command_id_map = {cmd.name: cmd.id for cmd in app_commands}
-
-            # Get all application commands from the tree
-            for command in self.tree.get_commands():
-                # Retrieve ID from our map
-                cmd_id = command_id_map.get(command.name)
-
-                cmd_info = {
-                    "name": command.name,
-                    "description": command.description,
-                    "id": str(cmd_id) if cmd_id else None,
-                    "type": "slash",
-                    "options": []
-                }
-
-                # Get command options/parameters
-                if hasattr(command, 'options'):
-                    for option in command.options:
-                        opt_info = {
-                            "name": option.name,
-                            "description": option.description,
-                            "required": option.required,
-                            "type": option.type.name if hasattr(option.type, 'name') else str(option.type)
-                        }
-                        if hasattr(option, 'choices') and option.choices:
-                            opt_info["choices"] = [
-                                {"name": choice.name, "value": choice.value}
-                                for choice in option.choices
-                            ]
-                        cmd_info["options"].append(opt_info)
-
-                commands_list.append(cmd_info)
+            command_mentions = get_command_mentions()
+            await command_mentions.update_from_bot(self)
         except Exception as e:
-            self.logger.error(f"Failed to fetch command IDs: {e}")
-            # Fallback: proceed without IDs if fetching fails
-            for command in self.tree.get_commands():
-                cmd_info = {
-                    "name": command.name,
-                    "description": command.description,
-                    "id": None,
-                    "type": "slash",
-                    "options": []
-                }
-
-                if hasattr(command, 'options'):
-                    for option in command.options:
-                        opt_info = {
-                            "name": option.name,
-                            "description": option.description,
-                            "required": option.required,
-                            "type": option.type.name if hasattr(option.type, 'name') else str(option.type)
-                        }
-                        if hasattr(option, 'choices') and option.choices:
-                            opt_info["choices"] = [
-                                {"name": choice.name, "value": choice.value}
-                                for choice in option.choices
-                            ]
-                        cmd_info["options"].append(opt_info)
-
-                commands_list.append(cmd_info)
-
-        # Sort commands by name
-        commands_list.sort(key=lambda x: x["name"])
-
-        # Create export data
-        # Add copy_format field to each command for easy copying
-        for cmd in commands_list:
-            if cmd.get("id"):
-                cmd["copy_format"] = f"</{cmd['name']}:{cmd['id']}>"
-            else:
-                cmd["copy_format"] = f"/{cmd['name']} (ID not available)"
-
-        export_data = {
-            "bot_name": self.user.name if self.user else "Unknown",
-            "bot_id": self.user.id if self.user else "Unknown",
-            "exported_at": datetime.now().isoformat(),
-            "total_commands": len(commands_list),
-            "commands": commands_list,
-            "quick_copy_formats": {
-                "with_ids": [f"</{cmd['name']}:{cmd['id']}>" for cmd in commands_list if cmd.get("id")],
-                "names_only": [f"/{cmd['name']}" for cmd in commands_list],
-                "single_line_with_ids": " ".join([f"</{cmd['name']}:{cmd['id']}>" for cmd in commands_list if cmd.get("id")]),
-                "single_line_names": " ".join([f"/{cmd['name']}" for cmd in commands_list])
-            }
-        }
-
-        # Check if commands have changed by comparing with existing file
-        commands_changed = True
-        if Config.COMMANDS_JSON_FILE.exists():
-            try:
-                with open(Config.COMMANDS_JSON_FILE, 'r', encoding='utf-8') as f:
-                    existing_data = json.load(f)
-                    # Compare commands only (ignore metadata like export time)
-                    existing_commands = existing_data.get("commands", [])
-                    if len(existing_commands) == len(commands_list):
-                        # Simple comparison - check if all command names match
-                        existing_names = sorted([c.get("name") for c in existing_commands])
-                        new_names = sorted([c.get("name") for c in commands_list])
-                        if existing_names == new_names:
-                            commands_changed = False
-                            self.logger.info("ℹ️ No changes detected in registered commands.")
-            except (json.JSONDecodeError, KeyError) as e:
-                self.logger.debug(f"Could not compare existing commands: {e}")
-
-        # Write to JSON file (always update to ensure latest data)
-        if commands_changed or not Config.COMMANDS_JSON_FILE.exists():
-            with open(Config.COMMANDS_JSON_FILE, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, indent=2, ensure_ascii=False)
-            self.logger.info(f"✅ Commands exported to '{Config.COMMANDS_JSON_FILE}'")
-        else:
-            # Still write to ensure file is up-to-date
-            with open(Config.COMMANDS_JSON_FILE, 'w', encoding='utf-8') as f:
-                json.dump(export_data, f, indent=2, ensure_ascii=False)
-            self.logger.info(f"✅ Commands file updated at '{Config.COMMANDS_JSON_FILE}'")
-
-        # Print commands in copyable format
-        self._print_copyable_commands(commands_list)
-
-    def _print_copyable_commands(self, commands_list: list) -> None:
-        """
-        Print all registered slash commands in a copyable format.
-        """
-        if not commands_list:
-            self.logger.info("⚠️ No slash commands registered.")
-            return
-
-        self.logger.info("=" * 60)
-        self.logger.info("📜 REGISTERED SLASH COMMANDS (Copyable Format)")
-        self.logger.info("=" * 60)
-
-        # Create a formatted text block for easy copying
-        output_lines = []
-        output_lines.append("")
-        output_lines.append("╔══════════════════════════════════════════════════════════╗")
-        output_lines.append("║           REGISTERED SLASH COMMANDS                      ║")
-        output_lines.append("╚══════════════════════════════════════════════════════════╝")
-        output_lines.append("")
-
-        for cmd in commands_list:
-            # Format: /command_name [option1] [option2] - Description
-            options_str = ""
-            if cmd["options"]:
-                opts = []
-                for opt in cmd["options"]:
-                    if opt.get("required", False):
-                        opts.append(f"[{opt['name']}]")
-                    else:
-                        opts.append(f"<{opt['name']}>")
-                options_str = " " + " ".join(opts)
-
-            output_lines.append(f"/{cmd['name']}{options_str}")
-            output_lines.append(f"   └─ {cmd['description']}")
-
-            if cmd["options"]:
-                for opt in cmd["options"]:
-                    req_status = "required" if opt.get("required", False) else "optional"
-                    output_lines.append(f"      • {opt['name']}: {opt['description']} ({req_status})")
-
-            output_lines.append("")
-
-        # Add the </name:id> format section
-        output_lines.append("═" * 60)
-        output_lines.append("📋 COPYABLE FORMAT (Paste directly in Discord):")
-        output_lines.append("═" * 60)
-        output_lines.append("")
-
-        for cmd in commands_list:
-            if cmd.get("id"):
-                copyable_cmd = f"</{cmd['name']}:{cmd['id']}>"
-                output_lines.append(copyable_cmd)
-                output_lines.append(f"   └─ {cmd['description']}")
-                output_lines.append("")
-            else:
-                output_lines.append(f"⚠️ /{cmd['name']} - ID not available (not synced?)")
-                output_lines.append("")
-
-        output_lines.append("═" * 60)
-        output_lines.append(f"Total Commands: {len(commands_list)}")
-        output_lines.append("═" * 60)
-
-        # Print each line
-        for line in output_lines:
-            self.logger.info(line)
-
-        # Also print a simple one-liner format for quick copying
-        self.logger.info("")
-        self.logger.info("📋 Quick Copy Format (all command names):")
-        self.logger.info("-" * 60)
-        command_names = " ".join([f"/{cmd['name']}" for cmd in commands_list])
-        self.logger.info(command_names)
-        self.logger.info("-" * 60)
-
-        # Print the </name:id> format one-liner
-        self.logger.info("")
-        self.logger.info("📋 Quick Copy Format (with IDs - paste directly in Discord):")
-        self.logger.info("-" * 60)
-        command_ids_line = " ".join([f"</{cmd['name']}:{cmd['id']}>" for cmd in commands_list if cmd.get("id")])
-        if command_ids_line:
-            self.logger.info(command_ids_line)
-        else:
-            self.logger.info("⚠️ No command IDs available (commands may not be synced yet)")
-        self.logger.info("-" * 60)
-        self.logger.info("")
+            self.logger.error(f"❌ Failed to update command mentions: {e}")
 
     async def _load_cogs(self) -> None:
         """
