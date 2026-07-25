@@ -1182,8 +1182,8 @@ class Vouch(commands.Cog):
         choices = []
         for item in matching_items:
             if isinstance(item, dict):
-                # Display: "1: Product A"
-                display_name = f"{item['code']}: {item['name']}"
+                # Display: "Product A" (Code removed from display)
+                display_name = item['name']
                 # Ensure display_name doesn't exceed 100 characters (Discord API limit)
                 if len(display_name) > 100:
                     display_name = display_name[:97] + "..."
@@ -1432,6 +1432,17 @@ class Vouch(commands.Cog):
         item: str
     ) -> None:
         if not await check_guild_context(interaction):
+            return
+
+        # Validate that seller and buyer are not the same person
+        if seller.id == buyer.id:
+            await interaction.response.send_message(
+                embed=create_error_embed(
+                    f"{EMOJI_CROSS} Invalid Selection",
+                    "The **Seller** and **Buyer** cannot be the same person.\n\nPlease select different members for each role."
+                ),
+                ephemeral=True
+            )
             return
 
         # Check if user is server administrator
