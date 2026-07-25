@@ -23,7 +23,7 @@ EMOJI_VOUCH = "<a:Laptop:1529207144162005215>"
 EMOJI_CART = "<:Cart:1529206909465399426>"
 EMOJI_SELLER = "<:Seller:1529206906437107995>"
 EMOJI_STAR = "<:Star:1529207360277577798>"
-EMOJI_COMMENT = "<:Comment:1529206903962341478>"
+EMOJI_COMMENT = "<:Review_Msg:1530394172689879302>"
 EMOJI_SEARCH = "<:Search:1529206901831893163>"
 EMOJI_TAG = "<:Tag:1529206892486721687>"
 EMOJI_CLOCK = "<:Clock:1529206889844314282>"
@@ -35,6 +35,7 @@ EMOJI_RANK = "<:Rank:1529733245032464454>"
 EMOJI_STATS = "<:Stats:1529852489896169603>"
 EMOJI_REVIEW = "<:Review:1529853305008689242>"
 EMOJI_IMAGE = "<:Image:1529866936249487491>"
+EMOJI_REQUEST = "<:Request:1530395499323064530>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -902,7 +903,7 @@ class TraderVouchView(View):
                     child.disabled = True
                 await self.message.edit(
                     view=self,
-                    content="**⚠️ This vouch session has expired.**\nNo vouch was recorded."
+                    content="**{EMOJI_SEARCH} This vouch session has expired.**\nNo vouch was recorded."
                 )
             except discord.HTTPException:
                 pass
@@ -1469,9 +1470,9 @@ class Vouch(commands.Cog):
         embed = discord.Embed(
             title=f"{EMOJI_CART} Customer Feedback Request",
             description=f"Facilitated by {interaction.user.mention}\n\n"
-                        f"**Seller:** {seller.mention}\n"
-                        f"**Item:** {item}\n\n"
-                        f"⭐ Rate your experience below and leave a review comment (optional).",
+                        f"{EMOJI_SELLER} **Seller:** {seller.mention}\n"
+                        f"{EMOJI_CART} **Item:** {item}\n\n"
+                        f"{EMOJI_REQUEST} Rate your experience below and leave a review comment (optional).",
             color=VOUCH_COLOR
         )
         embed.set_footer(text="This session expires in 5 minutes")
@@ -1516,7 +1517,7 @@ class Vouch(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="vouchsetting", description="Manage server items and cooldown with buttons")
+    @app_commands.command(name="vouchsetting", description="Manage server items, cooldown & toggle vouching on/off with buttons")
     async def vouchsetting_command(self, interaction: discord.Interaction) -> None:
         if not await check_guild_context(interaction):
             return
