@@ -5,6 +5,9 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View, Select
 
+# Import command mentions utility for dynamic command references
+from utils.command_mentions import get_command_mention
+
 
 # Custom Emojis (same as vouch.py)
 EMOJI_VOUCH = "<a:Laptop:1529207144162005215>"
@@ -121,7 +124,7 @@ class HelpSelect(Select):
 
     def create_vouch_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_VOUCH} </vouch:1529382737214177342> - Submit a Vouch",
+            title=f"{EMOJI_VOUCH} {get_command_mention('vouch')} - Submit a Vouch",
             description=(
                 f"Submit a vouch/review for a service or product you received from a seller.\n\n"
                 f"{EMOJI_STAR} **Command Usage:**\n"
@@ -183,7 +186,7 @@ class HelpSelect(Select):
 
     def create_vouchstats_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_STATS} </vouchstats:1529382737214177343> - View Statistics",
+            title=f"{EMOJI_STATS} {get_command_mention('vouchstats')} - View Statistics",
             description=(
                 f"View vouch statistics for any user including total vouches, average rating, and recent history.\n\n"
                 f"{EMOJI_STAR} **Command Usage:**\n"
@@ -224,7 +227,7 @@ class HelpSelect(Select):
 
     def create_tradervouch_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_REQUEST} </tradervouch:1529382737214177344> - Facilitated Vouch",
+            title=f"{EMOJI_REQUEST} {get_command_mention('tradervouch')} - Facilitated Vouch",
             description=(
                 f"Admin tool to facilitate a vouch session with interactive buttons.\n"
                 f"The buyer receives a message with buttons to submit their review.\n\n"
@@ -280,7 +283,7 @@ class HelpSelect(Select):
 
     def create_vouchsetup_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_TAG} </vouchsetup:1529382737214177345> - Configure Channel",
+            title=f"{EMOJI_TAG} {get_command_mention('vouchsetup')} - Configure Channel",
             description=(
                 f"Set up the channel where all vouches will be posted.\n\n"
                 f"{EMOJI_SETTING} **Permission Required:** Administrator\n\n"
@@ -322,7 +325,7 @@ class HelpSelect(Select):
 
     def create_vouchsetting_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_SETTING} </vouchsetting:1529390215360282699> - Server Settings",
+            title=f"{EMOJI_SETTING} {get_command_mention('vouchsetting')} - Server Settings",
             description=(
                 f"Manage server-specific vouch settings with interactive buttons.\n\n"
                 f"{EMOJI_SETTING} **Permission Required:** Administrator\n\n"
@@ -370,7 +373,7 @@ class HelpSelect(Select):
 
     def create_listitems_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_CART} </listitems:1529382737214177349> - View Registered Items",
+            title=f"{EMOJI_CART} {get_command_mention('listitems')} - View Registered Items",
             description=(
                 f"View all registered items/services for this server.\n"
                 f"Shows items in a paginated view with navigation buttons.\n\n"
