@@ -4,28 +4,76 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from discord.ui import Button, View, Select
+from discord import PartialEmoji
 
-EMOJI_VOUCH = "<a:Laptop:1529207144162005215>"
-EMOJI_CART = "<:Cart:1529206909465399426>"
-EMOJI_SELLER = "<:Seller:1529206906437107995>"
-EMOJI_STAR = "<:Star:1529207360277577798>"
-EMOJI_COMMENT = "<:Review_Msg:1530394172689879302>"
-EMOJI_SEARCH = "<:Search:1529206901831893163>"
-EMOJI_TAG = "<:Tag:1529206892486721687>"
-EMOJI_CLOCK = "<:Clock:1529206889844314282>"
-EMOJI_ARROW = "<:Arrow_GG:1529856775103320064>"
-EMOJI_CROSS = "<:Cross:1529485828672323684>"
-EMOJI_CHECK = "<:Check:1529549227770908803>"
-EMOJI_SETTING = "<:Setting:1529205660357980210>"
-EMOJI_RANK = "<:Rank:1529733245032464454>"
-EMOJI_STATS = "<:Stats:1529852489896169603>"
-EMOJI_REVIEW = "<:Review:1529853305008689242>"
-EMOJI_IMAGE = "<:Image:1529866936249487491>"
-EMOJI_REQUEST = "<:Request:1530395499323064530>"
-EMOJI_INFO = "<:Info:1530613793850130494>"
-EMOJI_ADMIN = "<:Admin:1530614195186307142>"
-EMOJI_CHANNEL = "<:Channel:1530613700028010698>"
-EMOJI_LIST = "<:List:1530613479713673436>"
+# Custom emoji definitions - ID only
+EMOJI_VOUCH_ID = 1529207144162005215
+EMOJI_CART_ID = 1529206909465399426
+EMOJI_SELLER_ID = 1529206906437107995
+EMOJI_STAR_ID = 1529207360277577798
+EMOJI_COMMENT_ID = 1530394172689879302
+EMOJI_SEARCH_ID = 1529206901831893163
+EMOJI_TAG_ID = 1529206892486721687
+EMOJI_CLOCK_ID = 1529206889844314282
+EMOJI_ARROW_ID = 1529856775103320064
+EMOJI_CROSS_ID = 1529485828672323684
+EMOJI_CHECK_ID = 1529549227770908803
+EMOJI_SETTING_ID = 1529205660357980210
+EMOJI_RANK_ID = 1529733245032464454
+EMOJI_STATS_ID = 1529852489896169603
+EMOJI_REVIEW_ID = 1529853305008689242
+EMOJI_IMAGE_ID = 1529866936249487491
+EMOJI_REQUEST_ID = 1530395499323064530
+EMOJI_INFO_ID = 1530613793850130494
+EMOJI_ADMIN_ID = 1530614195186307142
+EMOJI_CHANNEL_ID = 1530613700028010698
+EMOJI_LIST_ID = 1530613479713673436
+
+# PartialEmoji objects for use in Select options (emoji parameter requires PartialEmoji)
+EMOJI_VOUCH = PartialEmoji(name="Laptop", id=EMOJI_VOUCH_ID, animated=True)
+EMOJI_CART = PartialEmoji(name="Cart", id=EMOJI_CART_ID)
+EMOJI_SELLER = PartialEmoji(name="Seller", id=EMOJI_SELLER_ID)
+EMOJI_STAR = PartialEmoji(name="Star", id=EMOJI_STAR_ID)
+EMOJI_COMMENT = PartialEmoji(name="Review_Msg", id=EMOJI_COMMENT_ID)
+EMOJI_SEARCH = PartialEmoji(name="Search", id=EMOJI_SEARCH_ID)
+EMOJI_TAG = PartialEmoji(name="Tag", id=EMOJI_TAG_ID)
+EMOJI_CLOCK = PartialEmoji(name="Clock", id=EMOJI_CLOCK_ID)
+EMOJI_ARROW = PartialEmoji(name="Arrow_GG", id=EMOJI_ARROW_ID)
+EMOJI_CROSS = PartialEmoji(name="Cross", id=EMOJI_CROSS_ID)
+EMOJI_CHECK = PartialEmoji(name="Check", id=EMOJI_CHECK_ID)
+EMOJI_SETTING = PartialEmoji(name="Setting", id=EMOJI_SETTING_ID)
+EMOJI_RANK = PartialEmoji(name="Rank", id=EMOJI_RANK_ID)
+EMOJI_STATS = PartialEmoji(name="Stats", id=EMOJI_STATS_ID)
+EMOJI_REVIEW = PartialEmoji(name="Review", id=EMOJI_REVIEW_ID)
+EMOJI_IMAGE = PartialEmoji(name="Image", id=EMOJI_IMAGE_ID)
+EMOJI_REQUEST = PartialEmoji(name="Request", id=EMOJI_REQUEST_ID)
+EMOJI_INFO = PartialEmoji(name="Info", id=EMOJI_INFO_ID)
+EMOJI_ADMIN = PartialEmoji(name="Admin", id=EMOJI_ADMIN_ID)
+EMOJI_CHANNEL = PartialEmoji(name="Channel", id=EMOJI_CHANNEL_ID)
+EMOJI_LIST = PartialEmoji(name="List", id=EMOJI_LIST_ID)
+
+# String representations for use in embed titles/descriptions
+E_VOUCH = f"<a:Laptop:{EMOJI_VOUCH_ID}>"
+E_CART = f"<:Cart:{EMOJI_CART_ID}>"
+E_SELLER = f"<:Seller:{EMOJI_SELLER_ID}>"
+E_STAR = f"<:Star:{EMOJI_STAR_ID}>"
+E_COMMENT = f"<:Review_Msg:{EMOJI_COMMENT_ID}>"
+E_SEARCH = f"<:Search:{EMOJI_SEARCH_ID}>"
+E_TAG = f"<:Tag:{EMOJI_TAG_ID}>"
+E_CLOCK = f"<:Clock:{EMOJI_CLOCK_ID}>"
+E_ARROW = f"<:Arrow_GG:{EMOJI_ARROW_ID}>"
+E_CROSS = f"<:Cross:{EMOJI_CROSS_ID}>"
+E_CHECK = f"<:Check:{EMOJI_CHECK_ID}>"
+E_SETTING = f"<:Setting:{EMOJI_SETTING_ID}>"
+E_RANK = f"<:Rank:{EMOJI_RANK_ID}>"
+E_STATS = f"<:Stats:{EMOJI_STATS_ID}>"
+E_REVIEW = f"<:Review:{EMOJI_REVIEW_ID}>"
+E_IMAGE = f"<:Image:{EMOJI_IMAGE_ID}>"
+E_REQUEST = f"<:Request:{EMOJI_REQUEST_ID}>"
+E_INFO = f"<:Info:{EMOJI_INFO_ID}>"
+E_ADMIN = f"<:Admin:{EMOJI_ADMIN_ID}>"
+E_CHANNEL = f"<:Channel:{EMOJI_CHANNEL_ID}>"
+E_LIST = f"<:List:{EMOJI_LIST_ID}>"
 
 FOOTER_TEXT = "Vouch System Help • User Support"
 
@@ -102,19 +150,19 @@ class HelpSelect(Select):
 
     def create_main_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_INFO} Vouch System - Command Guide",
+            title=f"{E_INFO} Vouch System - Command Guide",
             description=(
                 f"Welcome to the **Vouch System**!\n\n"
                 f"This system allows users to submit reviews and ratings for sellers, "
                 f"helping build trust within the community.\n\n"
-                f"{EMOJI_ARROW} **Select a command from the dropdown below** to learn more about it.\n\n"
+                f"{E_ARROW} **Select a command from the dropdown below** to learn more about it.\n\n"
                 f"**Available Commands:**\n"
-                f"{EMOJI_VOUCH} `/vouch` - Submit a vouch for a service\n"
-                f"{EMOJI_STATS} `/vouchstats` - View vouch statistics\n"
-                f"{EMOJI_REQUEST} `/tradervouch` - Admin facilitated vouch\n"
-                f"{EMOJI_CHANNEL} `/vouchsetup` - Configure vouch channel\n"
-                f"{EMOJI_SETTING} `/vouchsetting` - Manage server settings\n"
-                f"{EMOJI_LIST} `/listitems` - View registered items"
+                f"{E_VOUCH} `/vouch` - Submit a vouch for a service\n"
+                f"{E_STATS} `/vouchstats` - View vouch statistics\n"
+                f"{E_REQUEST} `/tradervouch` - Admin facilitated vouch\n"
+                f"{E_CHANNEL} `/vouchsetup` - Configure vouch channel\n"
+                f"{E_SETTING} `/vouchsetting` - Manage server settings\n"
+                f"{E_LIST} `/listitems` - View registered items"
             ),
             color=discord.Color.gold()
         )
@@ -123,55 +171,55 @@ class HelpSelect(Select):
 
     def create_vouch_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_VOUCH} /vouch - Submit a Vouch",
+            title=f"{E_VOUCH} /vouch - Submit a Vouch",
             description=(
                 f"Submit a vouch/review for a service or product you received from a seller.\n\n"
-                f"{EMOJI_INFO} **Command Usage:**\n"
+                f"{E_INFO} **Command Usage:**\n"
                 f"`/vouch <seller> <item> <stars> [vouched_by] [review] [image]`\n\n"
-                f"{EMOJI_ARROW} **Parameters:**\n"
+                f"{E_ARROW} **Parameters:**\n"
             ),
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name=f"{EMOJI_SELLER} seller",
+            name=f"{E_SELLER} seller",
             value="The member who provided the service/product *(Required)*",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_CART} item",
+            name=f"{E_CART} item",
             value="The item or service purchased *(Required)*\nUse autocomplete to select from registered items",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_STAR} stars",
+            name=f"{E_STAR} stars",
             value="Rating from 1 to 5 stars *(Required)*\nChoices: ⭐, ⭐⭐, ⭐⭐⭐, ⭐⭐⭐⭐, ⭐⭐⭐⭐⭐",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_TAG} vouched_by",
+            name=f"{E_TAG} vouched_by",
             value="Submit on behalf of another member *(Optional)*\nDisplay only, doesn't affect stats",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_COMMENT} review",
+            name=f"{E_COMMENT} review",
             value="Optional review or comment *(Optional)*\nMax 500 characters",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_IMAGE} image",
+            name=f"{E_IMAGE} image",
             value="Optional proof image *(Optional)*\nAccepted: PNG, JPG, JPEG, WEBP",
             inline=False
         )
 
         embed.add_field(
-            name=f"{EMOJI_CLOCK} Cooldown",
+            name=f"{E_CLOCK} Cooldown",
             value="There is a server-configured cooldown between vouch submissions.\nCheck with admins for the current cooldown time.",
             inline=False
         )
 
         embed.add_field(
-            name=f"{EMOJI_CROSS} Restrictions",
+            name=f"{E_CROSS} Restrictions",
             value=(
                 "• You cannot vouch for yourself\n"
                 "• Vouching must be enabled on the server\n"
@@ -185,24 +233,24 @@ class HelpSelect(Select):
 
     def create_vouchstats_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_STATS} /vouchstats - View Statistics",
+            title=f"{E_STATS} /vouchstats - View Statistics",
             description=(
                 f"View vouch statistics for any user including total vouches, average rating, and recent history.\n\n"
-                f"{EMOJI_INFO} **Command Usage:**\n"
+                f"{E_INFO} **Command Usage:**\n"
                 f"`/vouchstats [member]`\n\n"
-                f"{EMOJI_ARROW} **Parameters:**\n"
+                f"{E_ARROW} **Parameters:**\n"
             ),
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name=f"{EMOJI_RANK} member",
+            name=f"{E_RANK} member",
             value="The member to view stats for *(Optional)*\nDefaults to yourself if not specified",
             inline=False
         )
 
         embed.add_field(
-            name=f"{EMOJI_STAR} Statistics Displayed",
+            name=f"{E_STAR} Statistics Displayed",
             value=(
                 "• **Total Vouches** - Number of vouches received\n"
                 "• **Average Rating** - Average star rating (out of 5.0)\n"
@@ -212,7 +260,7 @@ class HelpSelect(Select):
         )
 
         embed.add_field(
-            name=f"{EMOJI_INFO} Notes",
+            name=f"{E_INFO} Notes",
             value=(
                 "• Stats are server-specific\n"
                 "• Only shows vouches from this server\n"
@@ -226,36 +274,36 @@ class HelpSelect(Select):
 
     def create_tradervouch_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_REQUEST} /tradervouch - Facilitated Vouch",
+            title=f"{E_REQUEST} /tradervouch - Facilitated Vouch",
             description=(
                 f"Admin tool to facilitate a vouch session with interactive buttons.\n"
                 f"The buyer receives a message with buttons to submit their review.\n\n"
-                f"{EMOJI_ADMIN} **Permission Required:** Administrator\n\n"
-                f"{EMOJI_INFO} **Command Usage:**\n"
+                f"{E_ADMIN} **Permission Required:** Administrator\n\n"
+                f"{E_INFO} **Command Usage:**\n"
                 f"`/tradervouch <seller> <buyer> <item>`\n\n"
-                f"{EMOJI_ARROW} **Parameters:**\n"
+                f"{E_ARROW} **Parameters:**\n"
             ),
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name=f"{EMOJI_SELLER} seller",
+            name=f"{E_SELLER} seller",
             value="The seller receiving the vouch *(Required)*",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_CART} buyer",
+            name=f"{E_CART} buyer",
             value="The buyer who made the purchase *(Required)*\nThey will receive the feedback request",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_TAG} item",
+            name=f"{E_TAG} item",
             value="The item sold *(Required)*\nUse autocomplete to select from registered items",
             inline=False
         )
 
         embed.add_field(
-            name=f"{EMOJI_CHECK} How It Works",
+            name=f"{E_CHECK} How It Works",
             value=(
                 "1. Admin runs the command with seller, buyer, and item\n"
                 "2. Buyer receives a message with interactive buttons\n"
@@ -267,7 +315,7 @@ class HelpSelect(Select):
         )
 
         embed.add_field(
-            name=f"{EMOJI_CROSS} Restrictions",
+            name=f"{E_CROSS} Restrictions",
             value=(
                 "• Seller and buyer cannot be the same person\n"
                 "• Only administrators can use this command\n"
@@ -282,25 +330,25 @@ class HelpSelect(Select):
 
     def create_vouchsetup_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_CHANNEL} /vouchsetup - Configure Channel",
+            title=f"{E_CHANNEL} /vouchsetup - Configure Channel",
             description=(
                 f"Set up the channel where all vouches will be posted.\n\n"
-                f"{EMOJI_ADMIN} **Permission Required:** Administrator\n\n"
-                f"{EMOJI_INFO} **Command Usage:**\n"
+                f"{E_ADMIN} **Permission Required:** Administrator\n\n"
+                f"{E_INFO} **Command Usage:**\n"
                 f"`/vouchsetup <channel>`\n\n"
-                f"{EMOJI_ARROW} **Parameters:**\n"
+                f"{E_ARROW} **Parameters:**\n"
             ),
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name=f"{EMOJI_CHANNEL} channel",
+            name=f"{E_CHANNEL} channel",
             value="The text channel for vouches *(Required)*\nAll vouches will be posted here",
             inline=False
         )
 
         embed.add_field(
-            name=f"{EMOJI_CHECK} What This Does",
+            name=f"{E_CHECK} What This Does",
             value=(
                 "• Sets the designated channel for vouch submissions\n"
                 "• Required before any vouch commands will work\n"
@@ -310,7 +358,7 @@ class HelpSelect(Select):
         )
 
         embed.add_field(
-            name=f"{EMOJI_INFO} Tips",
+            name=f"{E_INFO} Tips",
             value=(
                 "• Create a dedicated #vouches or #reviews channel\n"
                 "• Make sure the bot has send permissions in that channel\n"
@@ -324,41 +372,41 @@ class HelpSelect(Select):
 
     def create_vouchsetting_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_SETTING} /vouchsetting - Server Settings",
+            title=f"{E_SETTING} /vouchsetting - Server Settings",
             description=(
                 f"Manage server-specific vouch settings with interactive buttons.\n\n"
-                f"{EMOJI_ADMIN} **Permission Required:** Administrator\n\n"
-                f"{EMOJI_INFO} **Command Usage:**\n"
+                f"{E_ADMIN} **Permission Required:** Administrator\n\n"
+                f"{E_INFO} **Command Usage:**\n"
                 f"`/vouchsetting`\n\n"
                 f"No parameters required - opens an interactive panel!\n\n"
-                f"{EMOJI_ARROW} **Settings Available:**\n"
+                f"{E_ARROW} **Settings Available:**\n"
             ),
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name=f"{EMOJI_LIST} Add Item",
+            name=f"{E_LIST} Add Item",
             value="Add custom items/services to the autocomplete list\nMembers can then select these when submitting vouches",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_CROSS} Remove Item",
+            name=f"{E_CROSS} Remove Item",
             value="Remove an item from the registered items list\nFrees up the code number for reuse",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_CLOCK} Set Cooldown",
+            name=f"{E_CLOCK} Set Cooldown",
             value="Configure the cooldown time between vouch submissions\nPrevents spam and ensures quality reviews",
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_CHECK} Toggle Vouch",
+            name=f"{E_CHECK} Toggle Vouch",
             value="Enable or disable the entire vouch system\nWhen disabled, no vouches can be submitted",
             inline=False
         )
 
         embed.add_field(
-            name=f"{EMOJI_INFO} Default Items",
+            name=f"{E_INFO} Default Items",
             value=(
                 "If no custom items are added, these defaults are available:\n"
                 "• Product A, Product B, Product C\n"
@@ -372,21 +420,21 @@ class HelpSelect(Select):
 
     def create_listitems_embed(self) -> discord.Embed:
         embed = discord.Embed(
-            title=f"{EMOJI_LIST} /listitems - View Registered Items",
+            title=f"{E_LIST} /listitems - View Registered Items",
             description=(
                 f"View all registered items/services for this server.\n"
                 f"Shows items in a paginated view with navigation buttons.\n\n"
-                f"{EMOJI_ADMIN} **Permission Required:** Administrator\n\n"
-                f"{EMOJI_INFO} **Command Usage:**\n"
+                f"{E_ADMIN} **Permission Required:** Administrator\n\n"
+                f"{E_INFO} **Command Usage:**\n"
                 f"`/listitems`\n\n"
                 f"No parameters required - displays the item list!\n\n"
-                f"{EMOJI_ARROW} **Features:**\n"
+                f"{E_ARROW} **Features:**\n"
             ),
             color=discord.Color.gold()
         )
 
         embed.add_field(
-            name=f"{EMOJI_TAG} Item Codes",
+            name=f"{E_TAG} Item Codes",
             value=(
                 "Each item has a unique code number\n"
                 "Codes can be reused when items are deleted\n"
@@ -395,7 +443,7 @@ class HelpSelect(Select):
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_SEARCH} Pagination",
+            name=f"{E_SEARCH} Pagination",
             value=(
                 "• Shows 10 items per page\n"
                 "• Navigate with Previous/Next buttons\n"
@@ -404,7 +452,7 @@ class HelpSelect(Select):
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_SETTING} Managing Items",
+            name=f"{E_SETTING} Managing Items",
             value=(
                 "To add/remove items, use `/vouchsetting`\n"
                 "This command is view-only for convenience"
@@ -445,7 +493,7 @@ class VouchHelp(commands.Cog):
         """Check if interaction is in a guild."""
         if interaction.guild is None:
             await interaction.response.send_message(
-                f"{EMOJI_CROSS} This command only works in servers, not in DMs.",
+                f"{E_CROSS} This command only works in servers, not in DMs.",
                 ephemeral=True
             )
             return False
@@ -454,19 +502,19 @@ class VouchHelp(commands.Cog):
     def _create_main_embed(self) -> discord.Embed:
         """Create the main help embed."""
         embed = discord.Embed(
-            title=f"{EMOJI_INFO} Vouch System - Command Guide",
+            title=f"{E_INFO} Vouch System - Command Guide",
             description=(
                 f"Welcome to the **Vouch System**!\n\n"
                 f"This system allows users to submit reviews and ratings for sellers, "
                 f"helping build trust within the community.\n\n"
-                f"{EMOJI_ARROW} **Select a command from the dropdown below** to learn more about it.\n\n"
+                f"{E_ARROW} **Select a command from the dropdown below** to learn more about it.\n\n"
                 f"**Available Commands:**\n"
-                f"{EMOJI_VOUCH} `/vouch` - Submit a vouch for a service\n"
-                f"{EMOJI_STATS} `/vouchstats` - View vouch statistics\n"
-                f"{EMOJI_REQUEST} `/tradervouch` - Admin facilitated vouch\n"
-                f"{EMOJI_CHANNEL} `/vouchsetup` - Configure vouch channel\n"
-                f"{EMOJI_SETTING} `/vouchsetting` - Manage server settings\n"
-                f"{EMOJI_LIST} `/listitems` - View registered items"
+                f"{E_VOUCH} `/vouch` - Submit a vouch for a service\n"
+                f"{E_STATS} `/vouchstats` - View vouch statistics\n"
+                f"{E_REQUEST} `/tradervouch` - Admin facilitated vouch\n"
+                f"{E_CHANNEL} `/vouchsetup` - Configure vouch channel\n"
+                f"{E_SETTING} `/vouchsetting` - Manage server settings\n"
+                f"{E_LIST} `/listitems` - View registered items"
             ),
             color=discord.Color.gold()
         )
