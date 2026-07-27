@@ -687,19 +687,19 @@ class VouchSettingView(View):
             return False
         return True
 
-    @discord.ui.button(label="Add Item", style=discord.ButtonStyle.green, emoji=EMOJI_CART)
+    @discord.ui.button(label="Add Item", style=discord.ButtonStyle.green, emoji=EMOJI_CART, row=0)
     async def add_item_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(AddItemModal(self.guild_id, self))
 
-    @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red, emoji=EMOJI_TAG)
+    @discord.ui.button(label="Remove Item", style=discord.ButtonStyle.red, emoji=EMOJI_TAG, row=0)
     async def remove_item_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(RemoveItemModal(self.guild_id, self))
 
-    @discord.ui.button(label="Set Cooldown", style=discord.ButtonStyle.blurple, emoji=EMOJI_CLOCK)
+    @discord.ui.button(label="Set Vouch Cooldown", style=discord.ButtonStyle.blurple, emoji=EMOJI_CLOCK, row=0)
     async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(CooldownModal(self.guild_id, self))
 
-    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green, row=0)
     async def toggle_vouch_btn(self, interaction: discord.Interaction, button: Button):
         current_enabled = is_vouch_enabled(self.guild_id)
         new_state = not current_enabled
@@ -722,7 +722,7 @@ class VouchSettingView(View):
         )
         await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
 
-    @discord.ui.button(label="Set Trader Role", style=discord.ButtonStyle.blurple, emoji=EMOJI_TRADER)
+    @discord.ui.button(label="Set Trader Role", style=discord.ButtonStyle.blurple, emoji=EMOJI_TRADER, row=1)
     async def set_trader_role_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_message(
             embed=discord.Embed(
@@ -793,7 +793,7 @@ class VouchSettingView(View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="Remove Trader Role", style=discord.ButtonStyle.red, emoji=EMOJI_CROSS)
+    @discord.ui.button(label="Remove Trader Role", style=discord.ButtonStyle.red, emoji=EMOJI_CROSS, row=1)
     async def remove_trader_role_btn(self, interaction: discord.Interaction, button: Button):
         trader_role_id = get_trader_role(self.guild_id)
         

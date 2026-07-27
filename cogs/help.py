@@ -27,6 +27,7 @@ EMOJI_STATS = "<:Stats:1529852489896169603>"
 EMOJI_REVIEW = "<:Review:1529853305008689242>"
 EMOJI_IMAGE = "<:Image:1529866936249487491>"
 EMOJI_REQUEST = "<:Request:1530395499323064530>"
+EMOJI_TRADER = "<:Trader:1531301115247726652>"
 
 FOOTER_TEXT = "Vouch System Help • Thank you for your valuable feedback ❤️"
 
@@ -231,7 +232,7 @@ class HelpSelect(Select):
             description=(
                 f"Admin tool to facilitate a vouch session with interactive buttons.\n"
                 f"The buyer receives a message with buttons to submit their review.\n\n"
-                f"{EMOJI_SETTING} **Permission Required:** Administrator\n\n"
+                f"{EMOJI_SETTING} **Permission Required:** Administrator **OR** configured Trader Role\n\n"
                 f"{EMOJI_STAR} **Command Usage:**\n"
                 f"`/tradervouch <seller> <buyer> <item>`\n\n"
                 f"{EMOJI_ARROW} **Parameters:**\n"
@@ -258,7 +259,7 @@ class HelpSelect(Select):
         embed.add_field(
             name=f"{EMOJI_CHECK} How It Works",
             value=(
-                "1. Admin runs the command with seller, buyer, and item\n"
+                "1. Admin or user with Trader Role runs the command with seller, buyer, and item\n"
                 "2. Buyer receives a message with interactive buttons\n"
                 "3. Buyer selects star rating and can add comments/images\n"
                 "4. Vouch is submitted to the configured channel\n"
@@ -271,7 +272,7 @@ class HelpSelect(Select):
             name=f"{EMOJI_CROSS} Restrictions",
             value=(
                 "• Seller and buyer cannot be the same person\n"
-                "• Only administrators can use this command\n"
+                "• Only administrators or users with configured Trader Role can use this command\n"
                 "• Vouching must be enabled on the server\n"
                 "• A vouch channel must be configured"
             ),
@@ -348,13 +349,23 @@ class HelpSelect(Select):
             inline=False
         )
         embed.add_field(
-            name=f"{EMOJI_CLOCK} Set Cooldown",
+            name=f"{EMOJI_CLOCK} Set Vouch Cooldown",
             value="Configure the cooldown time between vouch submissions\nPrevents spam and ensures quality reviews",
             inline=False
         )
         embed.add_field(
             name=f"{EMOJI_CHECK} Toggle Vouch",
             value="Enable or disable the entire vouch system\nWhen disabled, no vouches can be submitted",
+            inline=False
+        )
+        embed.add_field(
+            name=f"{EMOJI_TRADER} Set Trader Role",
+            value="Assign a role that gains permission to use `/tradervouch`\nUsers with this role can facilitate vouches without admin perms",
+            inline=False
+        )
+        embed.add_field(
+            name=f"{EMOJI_CROSS} Remove Trader Role",
+            value="Remove the configured Trader Role\nReverts `/tradervouch` access to Admins only",
             inline=False
         )
 
