@@ -36,6 +36,7 @@ EMOJI_STATS = "<:Stats:1529852489896169603>"
 EMOJI_REVIEW = "<:Review:1529853305008689242>"
 EMOJI_IMAGE = "<:Image:1529866936249487491>"
 EMOJI_REQUEST = "<:Request:1530395499323064530>"
+EMOJI_TRADER = "<:Trader:1531301115247726652>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -333,6 +334,30 @@ def set_vouch_enabled(guild_id: str, enabled: bool) -> None:
     save_config(config)
 
 
+def get_trader_role(guild_id: str) -> Optional[int]:
+    """Get the configured Trader Role ID for a specific server."""
+    config = load_config()
+    guild_data = config.get(str(guild_id), {})
+    return guild_data.get("trader_role")
+
+
+def set_trader_role(guild_id: str, role_id: int) -> None:
+    """Set the Trader Role ID for a specific server."""
+    config = load_config()
+    if str(guild_id) not in config:
+        config[str(guild_id)] = {}
+    config[str(guild_id)]["trader_role"] = role_id
+    save_config(config)
+
+
+def remove_trader_role(guild_id: str) -> None:
+    """Remove the Trader Role configuration for a specific server."""
+    config = load_config()
+    if str(guild_id) in config and "trader_role" in config[str(guild_id)]:
+        del config[str(guild_id)]["trader_role"]
+        save_config(config)
+
+
 def get_server_cooldown(guild_id: str) -> int:
     """Get vouch cooldown for a specific server (default 300 seconds / 5 minutes)."""
     cooldowns = load_json(COOLDOWNS_FILE, {})
@@ -576,9 +601,15 @@ def create_vouch_settings_embed(guild_id: str) -> discord.Embed:
     vouch_enabled = is_vouch_enabled(guild_id)
     enabled_status = f"{EMOJI_CHECK} Enabled" if vouch_enabled else f"{EMOJI_CROSS} Disabled"
     
+    trader_role_id = get_trader_role(guild_id)
+    if trader_role_id:
+        trader_role_display = f"<@&{trader_role_id}>"
+    else:
+        trader_role_display = "Not Configured"
+    
     embed = discord.Embed(
         title=f"{EMOJI_CART} Vouch Settings",
-        description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes\n{EMOJI_SETTING} **Vouch System:** {enabled_status}",
+        description=f"Manage your server's vouch items and cooldown using the buttons below.\n\n{EMOJI_CLOCK} **Current Cooldown:** {current_cooldown_minutes} minutes\n{EMOJI_SETTING} **Vouch System:** {enabled_status}\n{EMOJI_TRADER} **Trader Role:** {trader_role_display}",
         color=VOUCH_COLOR
     )
     total_items = len(get_items(guild_id))
@@ -635,10 +666,11 @@ class CooldownModal(Modal, title="Set Vouch Cooldown"):
 
 
 class VouchSettingView(View):
-    def __init__(self, guild_id: str, author_id: int, original_message: Optional[discord.Message] = None):
+    def __init__(self, guild_id: str, author_id: int, bot: commands.Bot, original_message: Optional[discord.Message] = None):
         super().__init__(timeout=300.0)  # 5 minutes timeout
         self.guild_id = guild_id
         self.author_id = author_id
+        self.bot = bot
         self.original_message = original_message
         
         # Set initial button style based on current vouch status
@@ -689,6 +721,103 @@ class VouchSettingView(View):
             color=SUCCESS_COLOR
         )
         await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+
+    @discord.ui.button(label="Set Trader Role", style=discord.ButtonStyle.blurple, emoji=EMOJI_TRADER)
+    async def set_trader_role_btn(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title=f"{EMOJI_TRADER} Set Trader Role",
+                description=f"Please mention a role (@Role) or send its Role ID in this channel within 5 minutes.\n\nOnly one role may be provided.\n\nThis role will gain permission to use `/tradervouch`.",
+                color=VOUCH_COLOR
+            ),
+            ephemeral=True
+        )
+        
+        def check(msg: discord.Message) -> bool:
+            return msg.author.id == interaction.user.id and msg.channel.id == interaction.channel.id
+        
+        try:
+            message = await self.bot.wait_for("message", timeout=300.0, check=check)
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                embed=create_error_embed(f"{EMOJI_CROSS} Timed Out", "You took too long to respond."),
+                ephemeral=True
+            )
+            return
+        
+        role_id = None
+        if message.role_mentions:
+            if len(message.role_mentions) == 1:
+                role_id = message.role_mentions[0].id
+            else:
+                await interaction.followup.send(
+                    embed=create_error_embed(f"{EMOJI_CROSS} Invalid Input", "Please provide exactly one role."),
+                    ephemeral=True
+                )
+                return
+        else:
+            content = message.content.strip()
+            if content.isdigit():
+                role_id = int(content)
+            else:
+                await interaction.followup.send(
+                    embed=create_error_embed(f"{EMOJI_CROSS} Invalid Input", "Please provide a valid role mention or Role ID."),
+                    ephemeral=True
+                )
+                return
+        
+        guild = interaction.guild
+        if guild is None:
+            return
+        
+        role = guild.get_role(role_id)
+        if role is None:
+            await interaction.followup.send(
+                embed=create_error_embed(f"{EMOJI_CROSS} Role Not Found", "The specified role does not exist in this server."),
+                ephemeral=True
+            )
+            return
+        
+        set_trader_role(self.guild_id, role_id)
+        
+        if self.original_message:
+            new_embed = create_vouch_settings_embed(self.guild_id)
+            await self.original_message.edit(embed=new_embed, view=self)
+        
+        await interaction.followup.send(
+            embed=discord.Embed(
+                title=f"{EMOJI_CHECK} Trader Role Updated",
+                description=f"Trader Role has been set to {role.mention}.",
+                color=SUCCESS_COLOR
+            ),
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="Remove Trader Role", style=discord.ButtonStyle.red, emoji=EMOJI_CROSS)
+    async def remove_trader_role_btn(self, interaction: discord.Interaction, button: Button):
+        trader_role_id = get_trader_role(self.guild_id)
+        
+        if trader_role_id is None:
+            await interaction.response.send_message(
+                embed=create_error_embed(f"{EMOJI_CROSS} No Trader Role", "No Trader Role has been configured."),
+                ephemeral=True
+            )
+            return
+        
+        remove_trader_role(self.guild_id)
+        
+        if self.original_message:
+            new_embed = create_vouch_settings_embed(self.guild_id)
+            await self.original_message.edit(embed=new_embed, view=self)
+        
+        await interaction.response.send_message(
+            embed=discord.Embed(
+                title=f"{EMOJI_CHECK} Trader Role Removed",
+                description="The Trader Role has been removed successfully.",
+                color=SUCCESS_COLOR
+            ),
+            ephemeral=True
+        )
 
 
 class AddItemModal(Modal, title="Add New Item"):
@@ -1445,16 +1574,25 @@ class Vouch(commands.Cog):
             )
             return
 
-        # Check if user is server administrator
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "This command is reserved for server administrators only."),
-                ephemeral=True
-            )
-            return
-
+        # Check if user has permission (Administrator or Trader Role)
         guild = interaction.guild
         if not guild:
+            return
+        
+        trader_role_id = get_trader_role(str(guild.id))
+        has_admin = interaction.user.guild_permissions.administrator
+        has_trader_role = False
+        
+        if trader_role_id:
+            trader_role = guild.get_role(trader_role_id)
+            if trader_role:
+                has_trader_role = trader_role in interaction.user.roles
+        
+        if not has_admin and not has_trader_role:
+            await interaction.response.send_message(
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Only Server Administrators or users with the configured Trader Role may use this command."),
+                ephemeral=True
+            )
             return
 
         # Check if vouching is enabled for this server
@@ -1502,7 +1640,7 @@ class Vouch(commands.Cog):
     async def tradervouch_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, commands.MissingPermissions):
             await interaction.response.send_message(
-                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Administrators only."),
+                embed=create_error_embed(f"{EMOJI_CROSS} Permission Denied", "Only Server Administrators or users with the configured Trader Role may use this command."),
                 ephemeral=True
             )
 
@@ -1547,7 +1685,7 @@ class Vouch(commands.Cog):
         
         embed = create_vouch_settings_embed(guild_id)
 
-        view = VouchSettingView(guild_id, author_id=interaction.user.id)
+        view = VouchSettingView(guild_id, author_id=interaction.user.id, bot=self.bot)
         await interaction.response.send_message(embed=embed, view=view)
         # Store reference to the original message for in-place edits
         view.original_message = await interaction.original_response()
