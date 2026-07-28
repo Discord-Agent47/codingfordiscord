@@ -1,1 +1,2 @@
-Nothing should be ignored based on the provided file changes. The only modified file is 'cogs/vouch.py', which is a source code file and should not be added to .gitignore.
+# Documentation
+VOUCH_SETUP_GUIDE.md
