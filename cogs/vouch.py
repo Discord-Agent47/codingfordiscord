@@ -19,24 +19,24 @@ ERROR_COLOR = discord.Color.red()
 VOUCH_COLOR = discord.Color.gold()
 
 # Custom Emojis
-EMOJI_VOUCH = "<a:Laptop:1529207144162005215>"
-EMOJI_CART = "<:Cart:1529206909465399426>"
-EMOJI_SELLER = "<:Seller:1529206906437107995>"
-EMOJI_STAR = "<:Star:1529207360277577798>"
-EMOJI_COMMENT = "<:Review_Msg:1530394172689879302>"
-EMOJI_SEARCH = "<:Search:1529206901831893163>"
-EMOJI_TAG = "<:Tag:1529206892486721687>"
-EMOJI_CLOCK = "<:Clock:1529206889844314282>"
-EMOJI_ARROW = "<:Arrow_GG:1529856775103320064>"
-EMOJI_CROSS = "<:Cross:1529485828672323684>"
-EMOJI_CHECK = "<:Check:1529549227770908803>"
-EMOJI_SETTING = "<:Setting:1529855660357980210>"
-EMOJI_RANK = "<:Rank:1529733245032464454>"
-EMOJI_STATS = "<:Stats:1529852489896169603>"
-EMOJI_REVIEW = "<:Review:1529853305008689242>"
-EMOJI_IMAGE = "<:Image:1529866936249487491>"
-EMOJI_REQUEST = "<:Request:1530395499323064530>"
-EMOJI_TRADER = "<:Trader:1531301115247726652>"
+EMOJI_VOUCH = "<a:Laptop:1531349427338608701>"
+EMOJI_CART = "<:Cart:1531349881598378045>"
+EMOJI_SELLER = "<:Seller:1531349842008473772>"
+EMOJI_STAR = "<:Star:1531349969741676826>"
+EMOJI_COMMENT = "<:Review_Msg:1531348125275656224>"
+EMOJI_SEARCH = "<:Search:1531349744021016790>"
+EMOJI_TAG = "<:Tag:1531349635229028522>"
+EMOJI_CLOCK = "<:Clock:1531349552194387998>"
+EMOJI_ARROW = "<:Arrow:1531348396428759161>"
+EMOJI_CROSS = "<:Cross:1531349206910898246>"
+EMOJI_CHECK = "<:Check:1531349113566920876>"
+EMOJI_SETTING = "<:Settings:1531348521024749760>"
+EMOJI_RANK = "<:Rank:1531348871488471071>"
+EMOJI_STATS = "<:Stats:1531348760448204871>"
+EMOJI_REVIEW = "<:Vouch:1531350523209318671>"
+EMOJI_IMAGE = "<:Image:1531348285762044144>"
+EMOJI_REQUEST = "<:Request:1531347956043612311>"
+EMOJI_TRADER = "<:Trader:1531347533601968353>"
 
 FOOTER_TEXT = "Thank you for your valuable feedback ❤️"
 
@@ -699,7 +699,7 @@ class VouchSettingView(View):
     async def set_cooldown_btn(self, interaction: discord.Interaction, button: Button):
         await interaction.response.send_modal(CooldownModal(self.guild_id, self))
 
-    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green, row=0)
+    @discord.ui.button(label="Toggle Vouching", style=discord.ButtonStyle.green, emoji=EMOJI_SETTING, row=0)
     async def toggle_vouch_btn(self, interaction: discord.Interaction, button: Button):
         current_enabled = is_vouch_enabled(self.guild_id)
         new_state = not current_enabled
@@ -727,7 +727,7 @@ class VouchSettingView(View):
         await interaction.response.send_message(
             embed=discord.Embed(
                 title=f"{EMOJI_TRADER} Set Trader Role",
-                description=f"Please mention a role (@Role) or send its Role ID in this channel within 5 minutes.\n\nOnly one role may be provided.\n\nThis role will gain permission to use `/tradervouch`.",
+                description=f"Please mention a role (@Role) or send its Role ID in this channel within 5 minutes & make sure the Bot has **View Channel** permission.\n\nOnly one role may be provided.\n\nThis role will gain permission to use `/tradervouch`.",
                 color=VOUCH_COLOR
             ),
             ephemeral=True
@@ -1032,7 +1032,7 @@ class TraderVouchView(View):
                     child.disabled = True
                 await self.message.edit(
                     view=self,
-                    content="**{EMOJI_SEARCH} This vouch session has expired.**\nNo vouch was recorded."
+                    content=f"**{EMOJI_SEARCH} This vouch session has expired.**\nNo vouch was recorded."
                 )
             except discord.HTTPException:
                 pass
