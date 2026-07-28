@@ -1184,11 +1184,16 @@ class TraderVouchView(View):
                 vouch_id=vouch_id
             )
             
+            # Build embeds list for sending
+            embeds = [vouch_embed]
+            
             if self.image_url:
-                vouch_embed.set_image(url=self.image_url)
+                proof_embed = discord.Embed(color=VOUCH_COLOR)
+                proof_embed.set_image(url=self.image_url)
+                embeds.append(proof_embed)
 
             try:
-                await vouch_channel.send(embed=vouch_embed)
+                await vouch_channel.send(embeds=embeds)
 
                 for child in self.children:
                     child.disabled = True
@@ -1463,11 +1468,16 @@ class Vouch(commands.Cog):
             vouched_by_override=vouched_by
         )
         
+        # Build embeds list for sending
+        embeds = [vouch_embed]
+        
         if image_url:
-            vouch_embed.set_image(url=image_url)
+            proof_embed = discord.Embed(color=VOUCH_COLOR)
+            proof_embed.set_image(url=image_url)
+            embeds.append(proof_embed)
 
         try:
-            await vouch_channel.send(embed=vouch_embed)
+            await vouch_channel.send(embeds=embeds)
         except discord.Forbidden:
             await interaction.response.send_message(
                 embed=create_error_embed(f"{EMOJI_CROSS} Permission Error", "No permission to send in vouch channel."),
