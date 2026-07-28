@@ -477,6 +477,18 @@ def create_vouch_embed(
     return embed
 
 
+def fix_embed_layout_for_image(embed: discord.Embed) -> None:
+    """
+    Add zero-width space fields to prevent embed from becoming narrow when an image is attached.
+    This ensures the text fields maintain proper width and alignment.
+    """
+    # Add invisible filler fields to balance the layout
+    # These use zero-width spaces to avoid visible content but take up space
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+
 class StarButton(Button):
     def __init__(self, stars: int):
         emoji_str = EMOJI_STAR * stars
@@ -1186,6 +1198,7 @@ class TraderVouchView(View):
             
             if self.image_url:
                 vouch_embed.set_image(url=self.image_url)
+                fix_embed_layout_for_image(vouch_embed)
 
             try:
                 await vouch_channel.send(embed=vouch_embed)
@@ -1465,6 +1478,7 @@ class Vouch(commands.Cog):
         
         if image_url:
             vouch_embed.set_image(url=image_url)
+            fix_embed_layout_for_image(vouch_embed)
 
         try:
             await vouch_channel.send(embed=vouch_embed)
