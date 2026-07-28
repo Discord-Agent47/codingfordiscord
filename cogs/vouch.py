@@ -1660,6 +1660,20 @@ class Vouch(commands.Cog):
             )
             return
 
+        # Check if the bot has permission to send messages in the specified channel
+        bot_member = interaction.guild.get_member(self.bot.user.id)
+        if bot_member:
+            channel_permissions = channel.permissions_for(bot_member)
+            if not channel_permissions.send_messages:
+                await interaction.response.send_message(
+                    embed=create_error_embed(
+                        f"{EMOJI_CROSS} Missing Permissions",
+                        f"I don't have permission to send messages in {channel.mention}. Please assign me the 'Send Messages' permission for this channel and retry the command."
+                    ),
+                    ephemeral=True
+                )
+                return
+
         set_vouch_channel(str(interaction.guild.id), channel.id)
         await interaction.response.send_message(
             embed=create_success_embed(f"Updated", f"Vouch channel set to {channel.mention}"),
