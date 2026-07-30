@@ -1,0 +1,34 @@
+# Core Dependencies
+discord.py>=2.3.0
+python-dotenv>=1.0.0
+
+# Database
+aiosqlite>=0.19.0
+sqlalchemy[asyncio]>=2.0.0
+
+# Configuration & Validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Logging
+structlog>=23.1.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Code Quality
+ruff>=0.1.0
+mypy>=1.5.0
+
+# Development
+black>=23.0.0
+isort>=5.12.0
+
+# Monitoring & Health
+prometheus-client>=0.17.0
+
+# Utilities
+aiohttp>=3.8.0
+typing-extensions>=4.7.0
